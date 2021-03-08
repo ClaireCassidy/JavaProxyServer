@@ -1,7 +1,7 @@
 // Creates a ProxyServer and runs it
 public class Launcher {
     public static void main(String[] args) {
-        ProxyServer proxy = new ProxyServer(1408);
+        ProxyServer proxy = new ProxyServer(8080);
 
 
         Thread proxyThread = new Thread(proxy);
