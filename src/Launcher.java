@@ -1,6 +1,9 @@
+import javax.imageio.IIOException;
+import java.io.IOException;
+
 // Creates a ProxyServer and runs it
 public class Launcher {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         ProxyServer proxy = new ProxyServer(8080);
 
 
@@ -13,6 +16,6 @@ public class Launcher {
             e.printStackTrace();
         }
 
-        proxy.stop();
+        //proxy.stop();
     }
 }
