@@ -1,8 +1,6 @@
 import com.sun.security.ntlm.Server;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -43,21 +41,26 @@ public class ConnectionHandlerThread extends Thread {
             InputStream inputStream = incoming.getInputStream();
             OutputStream outputStream = incoming.getOutputStream();
 
-            String request = "";
-            int nextByte = inputStream.read();
-            while (nextByte != -1) {
-//                System.out.print((char) nextByte);
-                request = request + (char) nextByte;    // capture request in String
-
-                nextByte = inputStream.read();
-            }
-
-            System.out.println(request);
-            parseHttpRequest(request);
+//            String request = "";
+//            int nextByte = inputStream.read();
+//            while (nextByte != -1) {
+////                System.out.print((char) nextByte);
+//                request = request + (char) nextByte;    // capture request in String
+//
+//                nextByte = inputStream.read();
+//            }
+//
+//            System.out.println(request);
+//            parseHttpRequest(request);
 
             // mesgs to and from a node are BYTE STREAMS, Strings -> bytes -> stream -> bytes -> Strings
             // so to send a HTTP header we literally send a string/byte/etc. through the stream between the
             // two socket endpoints.
+
+            BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
+            String inputLine;
+            while (!(inputLine = in.readLine()).equals(""))
+                System.out.println(inputLine);
 
             // HTTP RESPONSE
             String html = "<html><head><title>Test</title></head><body><h1>HI is it working YES</h1><p>Hello from thread "+id+"!</body></html>";
@@ -73,12 +76,14 @@ public class ConnectionHandlerThread extends Thread {
             outputStream.close();
             incoming.close();
 
-            System.out.println("ConnectionHandlerThread:"+id+" going to sleep ...");
+            System.out.println("ConnectionHandlerThread:"+id+" finished");
+//            System.out.println("ConnectionHandlerThread:"+id+" going to sleep ...");
+//
+//            sleep(5000);
 
-            sleep(5000);
-
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
             System.out.println("IOException in ConnectionHandlerThread "+id);
+            e.printStackTrace();
         }
     }
 
