@@ -58,9 +58,14 @@ public class ConnectionHandlerThread extends Thread {
             // two socket endpoints.
 
             BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
+            String request = "";
             String inputLine;
-            while (!(inputLine = in.readLine()).equals(""))
-                System.out.println(inputLine);
+            while ((inputLine = in.readLine()) != null && !inputLine.equals("")) {
+//                System.out.println(inputLine);
+                request += inputLine;
+            }
+
+            parseHttpRequest(request);
 
             // HTTP RESPONSE
             String html = "<html><head><title>Test</title></head><body><h1>HI is it working YES</h1><p>Hello from thread "+id+"!</body></html>";
@@ -81,6 +86,10 @@ public class ConnectionHandlerThread extends Thread {
 //
 //            sleep(5000);
 
+//            CLIENT REQUEST WILL HAVE FORM 'GET /www.example.com HTTP/1.1'
+//            So need to extract out the bit in the middle, actually go there, get the shit,
+//            GET REQUESTS DONT HAVE A BODY
+
         } catch (IOException e) {
             System.out.println("IOException in ConnectionHandlerThread "+id);
             e.printStackTrace();
@@ -93,9 +102,24 @@ public class ConnectionHandlerThread extends Thread {
 //        request = request.replace("\r", "\\r");
 //        System.out.println("\n\n" + request + "\n\n");
 
-        String[] requestLines = request.split("\r\n");
-        for (String line:requestLines) {
-            System.out.println("LINES:"+line);
+        try {
+            String[] requestLines = request.split("\r\n");
+//            for (String line : requestLines) {
+//                System.out.println("LINES:" + line);
+//            }
+
+            String methodLine = requestLines[0];
+
+            // GET /www.example.com HTTP/1.1
+            String[] methodLineTokens = methodLine.split(" ");  // get the individual tokens
+            String method = methodLineTokens[0];
+            String endpointUrl = methodLineTokens[1];
+            System.out.println("ConnectionHandlerThread:"+id+" wants to "+method+" "+endpointUrl);
+
+
+        } catch (Exception e) {
+            System.out.println("Error parsing request - invalid format");
+            e.printStackTrace();
         }
 
     }
