@@ -1,8 +1,7 @@
 import com.sun.security.ntlm.Server;
 
 import java.io.*;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.*;
 
 // Spawned for each incoming connection to handle connections in a multi-threaded format.
 public class ConnectionHandlerThread extends Thread {
@@ -65,9 +64,12 @@ public class ConnectionHandlerThread extends Thread {
                 request += inputLine;
             }
 
-            String forwardingUrl = parseHttpRequest(request);
-            if (forwardingUrl != null) {    // if not invalid format
-                System.out.println("\tFROM THREAD MAIN: Want URL " + forwardingUrl);
+            String resourceUrl = parseHttpRequest(request);
+            if (resourceUrl != null) {    // if not invalid format
+                System.out.println("\tFROM THREAD MAIN: Want URL " + resourceUrl);
+
+                // send the request to the endpoint
+                sendHttpRequestToEndpoint(resourceUrl);
             } else {
                 //TODO send back response saying request was invalid
             }
@@ -137,4 +139,39 @@ public class ConnectionHandlerThread extends Thread {
         return null;
     }
 
+    // for retrieving the data on behalf of the client
+    private void sendHttpRequestToEndpoint(String urlString) {
+
+        try {
+            URL url = new URL(urlString);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(5000);
+
+            BufferedReader in = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream()));
+            String inputLine;
+            StringBuffer content = new StringBuffer();
+            while ((inputLine = in.readLine()) != null) {
+                content.append(inputLine);
+            }
+
+            System.out.println(content.toString());
+//            in.close();
+
+            connection.disconnect();
+        } catch (MalformedURLException e) {
+            System.out.println(this.toString()+" received malformed url: "+urlString);
+            e.printStackTrace();
+        } catch (IOException e) {
+            System.out.println(this.toString()+" experienced IOException when connecting to "+urlString);
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public String toString () {
+        return "ConnectionHandlerThread:"+id;
+    }
 }
