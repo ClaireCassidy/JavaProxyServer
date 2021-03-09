@@ -65,7 +65,12 @@ public class ConnectionHandlerThread extends Thread {
                 request += inputLine;
             }
 
-            parseHttpRequest(request);
+            String forwardingUrl = parseHttpRequest(request);
+            if (forwardingUrl != null) {    // if not invalid format
+                System.out.println("\tFROM THREAD MAIN: Want URL " + forwardingUrl);
+            } else {
+                //TODO send back response saying request was invalid
+            }
 
             // HTTP RESPONSE
             String html = "<html><head><title>Test</title></head><body><h1>HI is it working YES</h1><p>Hello from thread "+id+"!</body></html>";
@@ -96,7 +101,7 @@ public class ConnectionHandlerThread extends Thread {
         }
     }
 
-    private void parseHttpRequest(String request) {
+    private String parseHttpRequest(String request) {
 
 //        request = request.replace("\n", "\\n");
 //        request = request.replace("\r", "\\r");
@@ -110,18 +115,26 @@ public class ConnectionHandlerThread extends Thread {
 
             String methodLine = requestLines[0];
 
-            // GET /www.example.com HTTP/1.1
+            // Method line has format 'GET /www.example.com HTTP/1.1'
             String[] methodLineTokens = methodLine.split(" ");  // get the individual tokens
             String method = methodLineTokens[0];
             String endpointUrl = methodLineTokens[1];
             System.out.println("ConnectionHandlerThread:"+id+" wants to "+method+" "+endpointUrl);
 
+            if (endpointUrl.startsWith("/")) endpointUrl = endpointUrl.substring(1);
+            if (!endpointUrl.startsWith("http://")) {
+                endpointUrl = "http://"+endpointUrl;    // prepend 'http://' to url if necessary
+                // don't need 'www.'
+            }
+
+            return endpointUrl;
 
         } catch (Exception e) {
             System.out.println("Error parsing request - invalid format");
             e.printStackTrace();
         }
 
+        return null;
     }
 
 }
