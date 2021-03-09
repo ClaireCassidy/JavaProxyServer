@@ -11,6 +11,8 @@ public class ConnectionHandlerThread extends Thread {
     private Socket incoming;
     private static int global_id;   // helps identify the threads; incremented every time a thread is created in the session
     private int id; // local id
+    private InputStream inputStream;
+    private OutputStream outputStream;
 
     final String CRLF = "\r\n"; // 13, 10 ascii
 
@@ -37,20 +39,8 @@ public class ConnectionHandlerThread extends Thread {
         System.out.println("RUNNING");
 
         try {
-            InputStream inputStream = incoming.getInputStream();
-            OutputStream outputStream = incoming.getOutputStream();
-
-//            String request = "";
-//            int nextByte = inputStream.read();
-//            while (nextByte != -1) {
-////                System.out.print((char) nextByte);
-//                request = request + (char) nextByte;    // capture request in String
-//
-//                nextByte = inputStream.read();
-//            }
-//
-//            System.out.println(request);
-//            parseHttpRequest(request);
+            inputStream = incoming.getInputStream();
+            outputStream = incoming.getOutputStream();
 
             // mesgs to and from a node are BYTE STREAMS, Strings -> bytes -> stream -> bytes -> Strings
             // so to send a HTTP header we literally send a string/byte/etc. through the stream between the
@@ -69,20 +59,30 @@ public class ConnectionHandlerThread extends Thread {
                 System.out.println("\tFROM THREAD MAIN: Want URL " + resourceUrl);
 
                 // send the request to the endpoint
-                sendHttpRequestToEndpoint(resourceUrl);
+                String resource = sendHttpRequestToEndpoint(resourceUrl);
+
+                if (resource != null && resource.length() > 0) {
+                    String response = "HTTP/1.1 200 OK" // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
+                            + CRLF
+                            + "Content-Length: " + resource.getBytes().length + CRLF // HEADER
+                            + CRLF // tells client were done with header
+                            + resource // response body
+                            + CRLF + CRLF;
+                    outputStream.write(response.getBytes());
+                } else {    // TODO something went wrong with fetching the resource; send appropriate response
+                    // HTTP RESPONSE
+                    String html = "<html><head><title>Test</title></head><body><h1>Something went wrong</h1><p>Hello from thread "+id+"!</body></html>";
+                    String response = "HTTP/1.1 200 OK" // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
+                            + CRLF
+                            + "Content-Length: " + html.getBytes().length + CRLF // HEADER
+                            + CRLF // tells client were done with header
+                            + html // response body
+                            + CRLF + CRLF;
+                    outputStream.write(response.getBytes());
+                }
             } else {
                 //TODO send back response saying request was invalid
             }
-
-            // HTTP RESPONSE
-            String html = "<html><head><title>Test</title></head><body><h1>HI is it working YES</h1><p>Hello from thread "+id+"!</body></html>";
-            String response = "HTTP/1.1 200 OK" // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
-                    + CRLF
-                    + "Content-Length: " + html.getBytes().length + CRLF // HEADER
-                    + CRLF // tells client were done with header
-                    + html // response body
-                    + CRLF + CRLF;
-            outputStream.write(response.getBytes());
 
             inputStream.close();
             outputStream.close();
@@ -123,6 +123,10 @@ public class ConnectionHandlerThread extends Thread {
             String endpointUrl = methodLineTokens[1];
             System.out.println("ConnectionHandlerThread:"+id+" wants to "+method+" "+endpointUrl);
 
+            if (endpointUrl.equals("/favicon.ico")) {
+                System.out.println(this.toString()+" ignoring request for favicon ...");
+                return null;   // sometimes browser wants root server's favicon; ignore
+            }
             if (endpointUrl.startsWith("/")) endpointUrl = endpointUrl.substring(1);
             if (!endpointUrl.startsWith("http://")) {
                 endpointUrl = "http://"+endpointUrl;    // prepend 'http://' to url if necessary
@@ -140,7 +144,7 @@ public class ConnectionHandlerThread extends Thread {
     }
 
     // for retrieving the data on behalf of the client
-    private void sendHttpRequestToEndpoint(String urlString) {
+    private String sendHttpRequestToEndpoint(String urlString) {
 
         try {
             URL url = new URL(urlString);
@@ -158,9 +162,14 @@ public class ConnectionHandlerThread extends Thread {
             }
 
             System.out.println(content.toString());
-//            in.close();
 
+            // release resources
+            in.close();
             connection.disconnect();
+
+            // Have requested resource, now pass back to run() to send back to client using socket
+            return content.toString();
+
         } catch (MalformedURLException e) {
             System.out.println(this.toString()+" received malformed url: "+urlString);
             e.printStackTrace();
@@ -168,6 +177,8 @@ public class ConnectionHandlerThread extends Thread {
             System.out.println(this.toString()+" experienced IOException when connecting to "+urlString);
             e.printStackTrace();
         }
+
+        return null;    // smth went wrong
     }
 
     @Override
