@@ -15,6 +15,8 @@ public class ConnectionHandlerThread extends Thread {
     private static int global_id;   // helps identify the threads; incremented every time a thread is created in the session
     private int id; // local id
 
+    final String CRLF = "\r\n"; // 13, 10 ascii
+
     public ConnectionHandlerThread(Socket incoming) throws IOException {
 
         this.incoming = incoming;
@@ -41,7 +43,17 @@ public class ConnectionHandlerThread extends Thread {
             InputStream inputStream = incoming.getInputStream();
             OutputStream outputStream = incoming.getOutputStream();
 
-            final String CRLF = "\r\n"; // 13, 10 ascii
+            String request = "";
+            int nextByte = inputStream.read();
+            while (nextByte != -1) {
+//                System.out.print((char) nextByte);
+                request = request + (char) nextByte;    // capture request in String
+
+                nextByte = inputStream.read();
+            }
+
+            System.out.println(request);
+            parseHttpRequest(request);
 
             // mesgs to and from a node are BYTE STREAMS, Strings -> bytes -> stream -> bytes -> Strings
             // so to send a HTTP header we literally send a string/byte/etc. through the stream between the
@@ -68,6 +80,19 @@ public class ConnectionHandlerThread extends Thread {
         } catch (IOException | InterruptedException e) {
             System.out.println("IOException in ConnectionHandlerThread "+id);
         }
+    }
+
+    private void parseHttpRequest(String request) {
+
+//        request = request.replace("\n", "\\n");
+//        request = request.replace("\r", "\\r");
+//        System.out.println("\n\n" + request + "\n\n");
+
+        String[] requestLines = request.split("\r\n");
+        for (String line:requestLines) {
+            System.out.println("LINES:"+line);
+        }
+
     }
 
 }
