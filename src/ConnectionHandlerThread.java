@@ -1,5 +1,7 @@
 import com.sun.security.ntlm.Server;
 
+// TODO set connection timeout for ConnectionHandlerThread so it can service more connections
+// keepalive
 import java.io.*;
 import java.net.*;
 
@@ -82,6 +84,7 @@ public class ConnectionHandlerThread extends Thread {
                 }
             } else {
                 //TODO send back response saying request was invalid
+                System.out.println("\t\tResponse invalid");
             }
 
             inputStream.close();
@@ -153,6 +156,13 @@ public class ConnectionHandlerThread extends Thread {
             connection.setConnectTimeout(5000);
             connection.setReadTimeout(5000);
 
+            //@Todo some urls block http by default idk what im supposed to do with this info
+            int resCode = connection.getResponseCode();
+            if (resCode > 300 && resCode < 400) {
+                String redirectHeader = connection.getHeaderField("Location");
+                System.out.println(redirectHeader);
+            }
+
             BufferedReader in = new BufferedReader(
                     new InputStreamReader(connection.getInputStream()));
             String inputLine;
@@ -162,6 +172,9 @@ public class ConnectionHandlerThread extends Thread {
             }
 
             System.out.println(content.toString());
+            if(content.length() == 0) {
+                System.out.println("WHY");
+            }
 
             // release resources
             in.close();
