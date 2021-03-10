@@ -1,2 +1,1 @@
 www.firefox.com
-www.example.com

@@ -39,7 +39,7 @@ public class ProxyServer implements Runnable {
             while (this.isRunning() && serverSocket.isBound() && !serverSocket.isClosed()) {
 
                 // wait for connection and when received, assign to incoming
-                Socket incoming = serverSocket.accept();
+                Socket incoming = serverSocket.accept();    // won't stop until it receives one more request which is annoying; write in docs that its safe to just terminate the program after quit regardless of if it exits itself.
                 System.out.println("Establishing ConnectionHandlerThread...");
 
                 ConnectionHandlerThread2 newGuyOnTheBlock = new ConnectionHandlerThread2(incoming);

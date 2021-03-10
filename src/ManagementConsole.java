@@ -91,6 +91,18 @@ public class ManagementConsole implements Runnable {
                     blockedSitesInstance.add(nextInputTokens[1]);
                 } else if (nextInputTokens[0].toLowerCase().equals("help")) {
                     printMgmtStyle("\n" + INSTRUCTIONS + "\n");
+                } else if (nextInputTokens[0].toLowerCase().equals("unblock")) {
+                    int index = blockedSitesInstance.indexOf(nextInputTokens[1]);
+                    if (index >= 0) {
+                        blockedSitesInstance.remove(index);
+                        printMgmtStyle("Successfully removed "+nextInputTokens[1]+" from blocklist.");
+
+                        for (String site:blockedSitesInstance) {
+                            printMgmtStyle(site);
+                        }
+                    } else {    // not blocked
+                        printMgmtStyle("\""+nextInputTokens[1] + "\" not found on blocklist.");
+                    }
                 } else if (nextInputTokens[0].toLowerCase().equals("quit")) {
                     printMgmtStyle("Quitting ... ");
                     printMgmtStyle("\t Writing blocked sites ...");
@@ -99,7 +111,6 @@ public class ManagementConsole implements Runnable {
                     // TODO saveCacheConfig();
                     proxy.stop();
                     this.stop();
-//                    System.out.println(""+this.isRunning());
                 } else {
                     throw new IOException();
                 }
