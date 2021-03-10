@@ -112,7 +112,15 @@ public class ManagementConsole implements Runnable {
     }
 
     private void saveBlockedSitesConfig() {
-
+        try {
+            FileWriter fw = new FileWriter("res\\blocked.txt");
+            for(String str:blockedSitesInstance) {
+                fw.write(str + System.lineSeparator());
+            }
+            fw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
