@@ -1,9 +1,6 @@
 import java.io.*;
 import java.net.*;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ConnectionHandlerThread2 extends Thread {
 
@@ -16,6 +13,10 @@ public class ConnectionHandlerThread2 extends Thread {
     private OutputStream outputStream;
 
     final String CRLF = "\r\n"; // 13, 10 ascii
+    final String FORBIDDEN = "FORBIDDEN";
+    final String FORBIDDEN_CODE = "403";
+    final String NOT_IMPLEMENTED = "NOT IMPLEMENTED";
+    final String NOT_IMPLEMENTED_CODE = "501";
 
     public ConnectionHandlerThread2(Socket incoming) throws IOException {
 
@@ -55,7 +56,7 @@ public class ConnectionHandlerThread2 extends Thread {
             String request = "";
             String inputLine;
             while ((inputLine = in.readLine()) != null && !inputLine.equals("")) {
-                System.out.println(inputLine);
+//                System.out.println(inputLine);
                 request += inputLine;
             }
 
@@ -68,32 +69,66 @@ public class ConnectionHandlerThread2 extends Thread {
             ArrayList<String> blockedSites = ManagementConsole.getBlockedSites();
             boolean endpointIsBlocked = false;
 
-            System.out.println("printing blocked sites: ...");
+//            System.out.println("printing blocked sites: ...");
             if (blockedSites != null) {
                 for (String site:blockedSites) {
                     System.out.println(site);
                     // capture "www.youtube.com/..." as well as "www.youtube.com"
                     if (endpointUrl.toLowerCase().contains(site.toLowerCase())) {
-                        System.out.println(this.toString()+" refusing connection to BLOCKED site.");
+//                        System.out.println(this.toString()+" refusing connection to BLOCKED site.");
                         endpointIsBlocked = true;
                         break;
                     }
                 }
             }
 
-            System.out.println(endpointIsBlocked);
+
             if (!endpointIsBlocked) {
+                String justTheUrl = endpointUrl;
+
+                if (endpointUrl.startsWith("https")) {
+                    justTheUrl = endpointUrl.substring(8);
+                } else if (endpointUrl.startsWith("http")) {
+                    justTheUrl = endpointUrl.substring(7);
+                }
+
+                if (justTheUrl.endsWith("/")) {
+                    justTheUrl = justTheUrl.substring(0,justTheUrl.length()-1); // trim trailing '/'
+                }
+
+                System.out.println(justTheUrl);
+
+                // now check if its in cache before contacting URL
+                ArrayList<File> cacheFiles = getCacheFiles();
+                for (File cachedFile:cacheFiles) {
+
+                    String filename = cachedFile.getName();
+                    ManagementConsole.printMgmtStyle(filename);
+                    if (filename.equals(justTheUrl)) {  // if it matches, it may not be in date
+                        if (isInDate(cachedFile)) {
+//                            sendCachedFile();
+                        } else {
+                            // Todo handle http request, cache response ADD BOOLEAN 'cache' TO handleHttpRequest() METHOD
+                        }
+                    }
+                }   // if the http request hasn't been dealt with at this point, it hasn't been cached -> continue as normal
 
                 if (method.toLowerCase().equals("connect")) {   // https connect request
                     handleHttpsRequest(endpointUrl);
                 } else if (method.toLowerCase().equals("get")) { // http get request
                     handleHttpRequest(endpointUrl);
+                } else {    // only service GET and CONNECT
+                    sendNotImplementedResponse();
                 }
 
             } else {
                 // TODO send bad request response
                 ManagementConsole.printMgmtStyle("Access to blocked site \""+endpointUrl+"\" denied.\n" +
-                        "\tEnter \"UNBLOCK "+endpointUrl+"\" to access.");
+                        "\tIf this is unexpected, you may have blocked a parent resource -\n"+
+                        "\tEnter \"BLOCKLIST\" to view your blocked sites. \n" +
+                        "\tEnter \"UNBLOCK [site]\" to access.");
+
+                sendHttpForbidden();
             }
 
         } catch (IOException e) {
@@ -140,6 +175,7 @@ public class ConnectionHandlerThread2 extends Thread {
 
     private void handleHttpsRequest(String urlString) {
         // establish tunnel
+        // @Todo
     }
 
     private void handleHttpRequest(String urlString){   // simple http get
@@ -162,7 +198,7 @@ public class ConnectionHandlerThread2 extends Thread {
             String expiryDate = null;   // for caching purposes
 
             // check everything was okay ->
-            System.out.println("---------\nRepsonse from "+urlString+":\n");
+//            System.out.println("---------\nRepsonse from "+urlString+":\n");
 
             // get response code
             int responseCode = connection.getResponseCode();
@@ -201,10 +237,10 @@ public class ConnectionHandlerThread2 extends Thread {
                 builder.append("\n");
             }
 
-            System.out.println(builder.toString());
+//            System.out.println(builder.toString());
 //            String responseStatusCode = connection.get
-            System.out.println("EXPIRY DATE: "+expiryDate);
-            System.out.println(content+"\n---------");
+//            System.out.println("EXPIRY DATE: "+expiryDate);
+//            System.out.println(content+"\n---------");
 
             String fullResponse = "";
             // given good response code, contents is what we want to send back
@@ -233,6 +269,74 @@ public class ConnectionHandlerThread2 extends Thread {
             e.printStackTrace();
         }
     }
+
+    // triggered as a response to a request for a blocked resource
+    private void sendHttpForbidden() throws IOException {
+        System.out.println("Sending forbidden...");
+        String fullResponse = "HTTP/1.1 "+FORBIDDEN_CODE+" "+FORBIDDEN // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
+                + CRLF // HEADER
+                + CRLF // tells client were done with header
+                + CRLF + CRLF;
+        outputStream.write(fullResponse.getBytes());
+        outputStream.flush();
+    }   // will say "proxy is refusing connections" -> go to inspector and network and see that its just gotten the 403 we sent ^
+
+
+    // triggered as a response to a non-GET or non-CONNECT method type in request
+    private void sendNotImplementedResponse() throws IOException {
+        System.out.println("Sending not implemented...");
+        String fullResponse = "HTTP/1.1 "+NOT_IMPLEMENTED_CODE+" "+NOT_IMPLEMENTED// [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
+                + CRLF // HEADER
+                + CRLF // tells client were done with header
+                + CRLF + CRLF;
+        outputStream.write(fullResponse.getBytes());
+        outputStream.flush();
+    }
+
+    private ArrayList<File> getCacheFiles() {
+
+        ArrayList<File> filenames = new ArrayList<>();
+
+        try {
+            File cacheDir = new File("res\\cache");     // file representing the directory
+            File[] cacheFiles = cacheDir.listFiles();
+
+            for (File cacheFile:cacheFiles) {   // copy to arraylist
+                if (cacheFile.isFile()) {   // ignore subdirectories
+                    filenames.add(cacheFile);
+//                    System.out.println(cacheFile.getName());
+                }
+            }
+        } catch (Exception e) {
+            System.out.println(this.toString()+" Experienced error retrieving cache files - check path");
+            e.printStackTrace();
+        }
+
+        return filenames;
+    }
+
+    private boolean isInDate(File cachedFile) {
+        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        // file cached with format
+        // 1    EXPIRY_DATE
+        // 2    FILE_CONTENTS ...
+        // 3    ...
+        // 4    ...
+
+        try {
+            Scanner sc = new Scanner(cachedFile);
+            if (sc.hasNextLine()) { // just need the first line
+                String expiryDate = sc.nextLine();
+                System.out.println(expiryDate);
+            }
+        } catch (Exception e) {
+            System.out.println(this.toString()+" Error getting date from Cached File \""+cachedFile.getName()+"\". Check file format.");
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
 
     @Override
     public String toString () {

@@ -20,6 +20,8 @@ public class Launcher {
     }
 }
 
+
+// On startup, run through expiry dates and delete expired files.
 // 1. check the directory for a filename that matches the url
 // 2. if match -> open file -> get first line -> check cur date time against expiry date
 //              -> if expiry date OK -> get rest of file and serve
