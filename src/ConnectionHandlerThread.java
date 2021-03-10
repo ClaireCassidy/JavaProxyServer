@@ -1,9 +1,12 @@
 import com.sun.security.ntlm.Server;
 
+
 // TODO set connection timeout for ConnectionHandlerThread so it can service more connections
 // keepalive
 import java.io.*;
 import java.net.*;
+
+// TODO add note to docs suggesting turning off Firefox Data Collection and Use to prevent flooding with telemetry requests
 
 // Spawned for each incoming connection to handle connections in a multi-threaded format.
 public class ConnectionHandlerThread extends Thread {
@@ -52,7 +55,7 @@ public class ConnectionHandlerThread extends Thread {
             String request = "";
             String inputLine;
             while ((inputLine = in.readLine()) != null && !inputLine.equals("")) {
-//                System.out.println(inputLine);
+                System.out.println(inputLine);
                 request += inputLine;
             }
 
@@ -124,12 +127,19 @@ public class ConnectionHandlerThread extends Thread {
             String[] methodLineTokens = methodLine.split(" ");  // get the individual tokens
             String method = methodLineTokens[0];
             String endpointUrl = methodLineTokens[1];
-            System.out.println("ConnectionHandlerThread:"+id+" wants to "+method+" "+endpointUrl);
+            System.out.println(this.toString()+" wants to "+method+" "+endpointUrl);
+
+            if (method.toLowerCase().equals("connect")) { //https connection request
+                //Todo handle https
+            } else if (method.toLowerCase().equals("get")) {    // get request
+//                httpGet();
+            }
 
             if (endpointUrl.equals("/favicon.ico")) {
                 System.out.println(this.toString()+" ignoring request for favicon ...");
                 return null;   // sometimes browser wants root server's favicon; ignore
             }
+
             if (endpointUrl.startsWith("/")) endpointUrl = endpointUrl.substring(1);
             if (!endpointUrl.startsWith("http://")) {
                 endpointUrl = "http://"+endpointUrl;    // prepend 'http://' to url if necessary
@@ -156,7 +166,8 @@ public class ConnectionHandlerThread extends Thread {
             connection.setConnectTimeout(5000);
             connection.setReadTimeout(5000);
 
-            //@Todo some urls block http by default idk what im supposed to do with this info
+            //@Todo some urls block http by default idk what im supposed to do with this info (change all outgoing requests to https?)
+            // @Todo Wait - just send back the original header i guess.
             int resCode = connection.getResponseCode();
             if (resCode > 300 && resCode < 400) {
                 String redirectHeader = connection.getHeaderField("Location");

@@ -6,7 +6,7 @@ import java.util.ArrayList;
 public class ProxyServer implements Runnable {
 
     private boolean stopped = false;
-    private ArrayList<ConnectionHandlerThread> activeConnectionHandlers;
+    private ArrayList<ConnectionHandlerThread2> activeConnectionHandlers;
     private int port;
     private ServerSocket serverSocket;
 
@@ -42,7 +42,7 @@ public class ProxyServer implements Runnable {
                 Socket incoming = serverSocket.accept();
                 System.out.println("Establishing ConnectionHandlerThread...");
 
-                ConnectionHandlerThread newGuyOnTheBlock = new ConnectionHandlerThread(incoming);
+                ConnectionHandlerThread2 newGuyOnTheBlock = new ConnectionHandlerThread2(incoming);
                 activeConnectionHandlers.add(newGuyOnTheBlock);
                 newGuyOnTheBlock.start();
             }

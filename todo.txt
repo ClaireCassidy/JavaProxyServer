@@ -1,0 +1,26 @@
+- Dealing with HTTP connections:
+	- Need to deal with requests not fulfilling (i.e. check response header from endpoint and react appropriately)
+	- Need to ensure persistent http connection - i.e. establish a timeout (i.e. prevent thread from exiting straight away when finished with request) and save the URL first given to the thread so it can resolve relative paths from subsequent requests (save thread and bool firstReq).
+
+- Add support for HTTPS:
+	- involves adding to handshake process
+
+- Add suppose for WebSockets:
+	- absolutely no idea but presume it involves adding to handshake process
+
+- Add terminal
+	- Probs run from main thread
+
+- Add caching:
+	- CSV file.
+	- dynamic data structure into which its loaded
+
+- Add blocking:
+	- v simple, blocking file and dynamic data structure into which its loaded
+
+- DONT FORGET TO LEAVE TIME TO DO DOCS AND VIDEO
+
+
+When testing the server, a nice way to route all requests through the Proxy was by going to settings in firefox > search "proxy" and routing all requests through "127.0.0.1" and port "8080". Firefox sends a ton of telemetry data by default which doesn't play well with the proxy server and will flood the console, so it is also reccommended to turn off Head on over to about:preferences#privacy and untick all the checkboxes under Firefox Data Collection and Use and restart Firefox.
+
+Now, any http/https requests entered into the search bar will be automatically routed through the proxy.
