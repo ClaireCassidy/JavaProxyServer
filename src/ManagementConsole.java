@@ -16,7 +16,8 @@ public class ManagementConsole implements Runnable {
     private static final String INSTRUCTIONS = "Enter a command to configure the Proxy Server:\n"+
             "\tBLOCK [url] \t\t- block the specified URL\n"+
             "\tHELP \t\t\t\t- print this message again\n"+
-            "\tQUIT \t\t\t\t- save blocked/cache config and safely exit program\n";
+            "\tQUIT \t\t\t\t- save blocked/cache config and safely exit program\n"+
+            "\tBLOCKLIST \t\t\t- print list of blocked sites";
 
 
     public ManagementConsole() throws IOException {
@@ -103,7 +104,12 @@ public class ManagementConsole implements Runnable {
                     } else {    // not blocked
                         printMgmtStyle("\""+nextInputTokens[1] + "\" not found on blocklist.");
                     }
-                } else if (nextInputTokens[0].toLowerCase().equals("quit")) {
+                } else if (nextInputTokens[0].toLowerCase().equals("blocklist")) {
+                    for (String site:blockedSitesInstance) {
+                        printMgmtStyle(site);
+                    }
+                }
+                else if (nextInputTokens[0].toLowerCase().equals("quit")) {
                     printMgmtStyle("Quitting ... ");
                     printMgmtStyle("\t Writing blocked sites ...");
                     saveBlockedSitesConfig();
