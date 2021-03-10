@@ -139,10 +139,13 @@ public class ConnectionHandlerThread2 extends Thread {
             System.out.println("---------\nRepsonse from "+urlString+":\n");
 
             // get response code
+            int responseCode = connection.getResponseCode();
+            String responseMsg = connection.getResponseMessage();
+
             StringBuilder builder = new StringBuilder();
-            builder.append(connection.getResponseCode())
+            builder.append(responseCode)
                     .append(" ")
-                    .append(connection.getResponseMessage())
+                    .append(responseMsg)
                     .append("\n");
 
             // get headers
@@ -176,6 +179,23 @@ public class ConnectionHandlerThread2 extends Thread {
 //            String responseStatusCode = connection.get
             System.out.println("EXPIRY DATE: "+expiryDate);
             System.out.println(content+"\n---------");
+
+            String fullResponse = "";
+            // given good response code, contents is what we want to send back
+            if (responseCode >= 200 && responseCode < 300) { // alles gut
+
+                fullResponse = "HTTP/1.1 "+responseCode+" "+responseMsg // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
+                        + CRLF
+                        + "Content-Length: " + content.toString().getBytes().length + CRLF // HEADER
+                        + CRLF // tells client were done with header
+                        + content.toString() // response body
+                        + CRLF + CRLF;
+                outputStream.write(fullResponse.getBytes());
+                outputStream.flush();
+
+            } else {
+                // TODO handle other status codes
+            }
 
         } catch (ProtocolException e) {
             System.out.println(this.toString()+" experienced ProtocolException - check headers");
