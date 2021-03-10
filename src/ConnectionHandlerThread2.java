@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -63,12 +64,37 @@ public class ConnectionHandlerThread2 extends Thread {
 
             System.out.println(this.toString()+" wants to "+method+" "+endpointUrl);
 
-            if (method.toLowerCase().equals("connect")) {   // https connect request
-                handleHttpsRequest(endpointUrl);
-            } else if (method.toLowerCase().equals("get")) { // http get request
-                handleHttpRequest(endpointUrl);
+            // check resource not on blocklist
+            ArrayList<String> blockedSites = ManagementConsole.getBlockedSites();
+            boolean endpointIsBlocked = false;
+
+            System.out.println("printing blocked sites: ...");
+            if (blockedSites != null) {
+                for (String site:blockedSites) {
+                    System.out.println(site);
+                    // capture "www.youtube.com/..." as well as "www.youtube.com"
+                    if (endpointUrl.toLowerCase().contains(site.toLowerCase())) {
+                        System.out.println(this.toString()+" refusing connection to BLOCKED site.");
+                        endpointIsBlocked = true;
+                        break;
+                    }
+                }
             }
 
+            System.out.println(endpointIsBlocked);
+            if (!endpointIsBlocked) {
+
+                if (method.toLowerCase().equals("connect")) {   // https connect request
+                    handleHttpsRequest(endpointUrl);
+                } else if (method.toLowerCase().equals("get")) { // http get request
+                    handleHttpRequest(endpointUrl);
+                }
+
+            } else {
+                // TODO send bad request response
+                ManagementConsole.printMgmtStyle("Access to blocked site \""+endpointUrl+"\" denied.\n" +
+                        "\tEnter \"UNBLOCK "+endpointUrl+"\" to access.");
+            }
 
         } catch (IOException e) {
             System.out.println("IOException in ConnectionHandlerThread "+id);

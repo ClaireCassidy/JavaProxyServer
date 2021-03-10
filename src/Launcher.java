@@ -1,18 +1,13 @@
 import javax.imageio.IIOException;
 import java.io.IOException;
 
+// TODO merge launcher and ManagementConsole
 // Creates a ProxyServer and runs it
 public class Launcher {
     public static void main(String[] args) throws IOException {
 
-        ProxyServer proxy = new ProxyServer(8080);
-
         Thread mgmtConsole = new Thread(new ManagementConsole());
         mgmtConsole.start();
-
-        Thread proxyThread = new Thread(proxy);
-        proxyThread.start();
-
 
 
 //        try {

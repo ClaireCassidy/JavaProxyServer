@@ -5,7 +5,7 @@ import java.util.ArrayList;
 
 public class ProxyServer implements Runnable {
 
-    private boolean stopped = false;
+    private volatile boolean stopped = false;
     private ArrayList<ConnectionHandlerThread2> activeConnectionHandlers;
     private int port;
     private ServerSocket serverSocket;
@@ -16,7 +16,7 @@ public class ProxyServer implements Runnable {
         this.port = port;
 
         serverSocket = new ServerSocket(port);
-        System.out.println("Server established on port "+port);
+        System.out.println("Server established on port " + port);
     }
 
     // may be called from Launcher to stop the server
@@ -36,7 +36,7 @@ public class ProxyServer implements Runnable {
 
         // set up socket on specified port
         try {
-            while (serverSocket.isBound() && !serverSocket.isClosed()) {
+            while (this.isRunning() && serverSocket.isBound() && !serverSocket.isClosed()) {
 
                 // wait for connection and when received, assign to incoming
                 Socket incoming = serverSocket.accept();
@@ -48,7 +48,7 @@ public class ProxyServer implements Runnable {
             }
 
         } catch (IOException e) {
-            System.out.println("Error creating server socket @PORT:"+port);
+            System.out.println("Error creating server socket @PORT:" + port);
             e.printStackTrace();
         }
 
