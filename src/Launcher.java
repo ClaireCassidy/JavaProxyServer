@@ -19,3 +19,9 @@ public class Launcher {
         //proxy.stop();
     }
 }
+
+// 1. check the directory for a filename that matches the url
+// 2. if match -> open file -> get first line -> check cur date time against expiry date
+//              -> if expiry date OK -> get rest of file and serve
+//              -> else -> delete file from cache -> forward request as normal -> save response to cache
+// 3. if no match -> forward request as normal -> save response to cache

@@ -24,7 +24,9 @@ public class ManagementConsole implements Runnable {
         // open blocked sites file
 
         File blockedSitesFile = new File("res\\blocked.txt");
+        File cacheFile = new File("res\\cache.csv");
 
+        // load the blocked sites into memory
         try {
             if (blockedSitesFile.exists()) {
                 Scanner sc = new Scanner(blockedSitesFile);     //file to be scanned
@@ -46,6 +48,8 @@ public class ManagementConsole implements Runnable {
 
             e.printStackTrace();
         }
+
+        // can't load the cache dynamically.
 
         // create the proxy server
         proxy = new ProxyServer(8080);
