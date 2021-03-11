@@ -42,6 +42,7 @@ public class ConnectionHandlerThread2 extends Thread {
 
         // assign id to thread
         setId();
+
     }
 
     // prevent race condition
@@ -464,7 +465,7 @@ public class ConnectionHandlerThread2 extends Thread {
 
     }
 
-    private String trimUrl(String rawUrl) { // trims unecessary stuff from request url so that it can be effectively matched to cache files
+    private static String trimUrl(String rawUrl) { // trims unecessary stuff from request url so that it can be effectively matched to cache files
         String justTheUrl = rawUrl;
 
         if (rawUrl.startsWith("https")) {
@@ -499,6 +500,27 @@ public class ConnectionHandlerThread2 extends Thread {
     public String toString() {
         return "ConnectionHandlerThread2:" + id;
     }
+
+    public static String getCacheFilenameFromUrl(String url) { // should be a url like www.example.com/files/folder
+        // 	www.w3.org/Icons/w3c_logo.svg
+        //      convert _ to ,,,
+        //  www.w3.org/Icons/w3c,,,logo.svg
+        //  www.w3.org_Icons_w3c,,,logo.svg
+
+        String filename = trimUrl(url); // trim if hasn't been already; removes 'http(s)://' and trailing '/'
+        filename = filename.replaceAll("_", ",,,");
+        filename = filename.replaceAll("/", "_");
+
+        return filename;
+    }
+
+    public static String getUrlFromCacheFilename(String filename) {
+        String url = filename;
+        url = url.replaceAll("_", "/");
+        url = url.replaceAll(",,,", "_");
+
+        return url;
+    }
 }
 
 // http request ->
@@ -506,3 +528,4 @@ public class ConnectionHandlerThread2 extends Thread {
 //          handle connection for image
 //      else
 //          handle connection for webpage (wgat we have)
+

@@ -1,6 +1,7 @@
 import com.sun.xml.internal.ws.api.message.ExceptionHasMessage;
 
 import java.io.*;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Scanner;
 
@@ -89,6 +90,9 @@ public class ManagementConsole implements Runnable {
 
             String nextInput = in.nextLine();
             try {
+
+
+
                 String[] nextInputTokens = nextInput.split(" ");
                 if (nextInputTokens[0].toLowerCase().equals("block")) {
                     printMgmtStyle("You wanna block " + nextInputTokens[1]);
@@ -149,4 +153,6 @@ public class ManagementConsole implements Runnable {
         return "\tMGMT-CONSOLE: ";
     }
 }
+
+
 
