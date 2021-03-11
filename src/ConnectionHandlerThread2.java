@@ -1,3 +1,5 @@
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.*;
 import java.time.ZonedDateTime;
@@ -26,6 +28,12 @@ public class ConnectionHandlerThread2 extends Thread {
     final String NOT_IMPLEMENTED_CODE = "501";
     final String OK = "OK";
     final String OK_CODE = "200";
+
+    final String JPG = "jpg";
+    final String JPEG = "jpeg";
+    final String GIF = "gif";
+    final String PNG = "png";
+
 
     public ConnectionHandlerThread2(Socket incoming) throws IOException {
 
@@ -73,6 +81,7 @@ public class ConnectionHandlerThread2 extends Thread {
             String endpointUrl = getURL(request);
 
             System.out.println(this.toString() + " wants to " + method + " " + endpointUrl);
+            ManagementConsole.printMgmtStyle(getResourceExtension(endpointUrl));
 
             // check resource not on blocklist
             ArrayList<String> blockedSites = ManagementConsole.getBlockedSites();
@@ -186,126 +195,155 @@ public class ConnectionHandlerThread2 extends Thread {
 
     private void handleHttpRequest(String urlString) {   // simple http get (non-cached)
 
+        ManagementConsole.printMgmtStyle("HEREEEEEEEE:" + urlString);
         String expiryDate = null;   // for caching purposes
+        String urlExtension = getResourceExtension(urlString);  // decide what kind of connection stream to use
+        if (isImageType(urlExtension)) {    // handle image stream separately
+            try {
+                URL url = new URL(urlString);
 
-        try {
-            URL url = new URL(urlString);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();    // connect to endpoint
-            connection.setRequestMethod("GET");         // indicate method type in header
-            connection.setConnectTimeout(5000);         // cancel long connection
-            connection.setReadTimeout(5000);            // cancel long-awaited reply
-
-            // read response from requested endpoint, store in 'content'
-            BufferedReader in = new BufferedReader(
-                    new InputStreamReader(connection.getInputStream()));
-            String inputLine;
-            StringBuffer content = new StringBuffer();
-            while ((inputLine = in.readLine()) != null) {
-                content.append(inputLine);
-            }
-
-
-            // check everything was okay ->
-            System.out.println("---------\nRepsonse from "+urlString+":\n");
-
-            // get response code
-            int responseCode = connection.getResponseCode();
-            String responseMsg = connection.getResponseMessage();
-
-            StringBuilder builder = new StringBuilder();
-            builder.append(responseCode)
-                    .append(" ")
-                    .append(responseMsg)
-                    .append("\n");
-
-            // get headers
-            Map<String, List<String>> map = connection.getHeaderFields();
-            for (Map.Entry<String, List<String>> entry : map.entrySet()) {
-                if (entry.getKey() == null)
-                    continue;
-                builder.append(entry.getKey())
-                        .append(": ");
-
-                if (entry.getKey().toLowerCase().equals("expires")) {
-                    expiryDate = entry.getValue().get(0);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                BufferedImage imgResource = ImageIO.read(connection.getInputStream());     // fetch the resource and store it in 'imgResource'
+                if (imgResource != null) {                          // found image at given url
+                    String responseHeader = "HTTP/1.1 " + OK_CODE + " " + OK
+                            + CRLF + CRLF;
+                    outputStream.write(responseHeader.getBytes());
+                    ImageIO.write(imgResource, urlExtension, outputStream);
                 }
 
-                List<String> headerValues = entry.getValue();
-                Iterator<String> it = headerValues.iterator();
-                if (it.hasNext()) {
-                    builder.append(it.next());
+            } catch (MalformedURLException e) {
 
-                    while (it.hasNext()) {
-                        builder.append(", ")
-                                .append(it.next());
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {    // send normal text type
+            try {
+                URL url = new URL(urlString);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();    // connect to endpoint
+                connection.setRequestMethod("GET");         // indicate method type in header
+                connection.setConnectTimeout(5000);         // cancel long connection
+                connection.setReadTimeout(5000);            // cancel long-awaited reply
+
+                // read response from requested endpoint, store in 'content'
+                BufferedReader in = new BufferedReader(
+                        new InputStreamReader(connection.getInputStream()));
+                String inputLine;
+                StringBuffer content = new StringBuffer();
+                while ((inputLine = in.readLine()) != null) {
+                    content.append(inputLine);
+                }
+
+
+                // check everything was okay ->
+                System.out.println("---------\nRepsonse from " + urlString + ":\n");
+
+                // get response code
+                int responseCode = connection.getResponseCode();
+                String responseMsg = connection.getResponseMessage();
+
+                StringBuilder builder = new StringBuilder();
+                builder.append(responseCode)
+                        .append(" ")
+                        .append(responseMsg)
+                        .append("\n");
+
+                // get headers
+                Map<String, List<String>> map = connection.getHeaderFields();
+                for (Map.Entry<String, List<String>> entry : map.entrySet()) {
+                    if (entry.getKey() == null)
+                        continue;
+                    builder.append(entry.getKey())
+                            .append(": ");
+
+                    if (entry.getKey().toLowerCase().equals("expires")) {
+                        expiryDate = entry.getValue().get(0);
                     }
+
+                    List<String> headerValues = entry.getValue();
+                    Iterator<String> it = headerValues.iterator();
+                    if (it.hasNext()) {
+                        builder.append(it.next());
+
+                        while (it.hasNext()) {
+                            builder.append(", ")
+                                    .append(it.next());
+                        }
+                    }
+
+                    builder.append("\n");
                 }
 
-                builder.append("\n");
-            }
+                System.out.println(builder.toString());
+                System.out.println("EXPIRY DATE FROM RESPONSE: " + expiryDate);
+                System.out.println(content + "\n---------");
 
-            System.out.println(builder.toString());
-            System.out.println("EXPIRY DATE FROM RESPONSE: " + expiryDate);
-            System.out.println(content + "\n---------");
+                String fullResponse = "";
 
-            String fullResponse = "";
-
-            // given good response code, contents is what we want to send back
-            if (responseCode >= 200 && responseCode < 300) { // alles gut
+                // given good response code, contents is what we want to send back
+                if (responseCode >= 200 && responseCode < 300) { // alles gut
 
 
-                fullResponse = "HTTP/1.1 " + responseCode + " " + responseMsg // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
-                        + CRLF
-                        + "Content-Length: " + content.toString().getBytes().length + CRLF // HEADER
-                        + CRLF // tells client were done with header
-                        + content.toString() // response body
-                        + CRLF + CRLF;
-                outputStream.write(fullResponse.getBytes());
-                outputStream.flush();
-                // cache the response
+                    fullResponse = "HTTP/1.1 " + responseCode + " " + responseMsg // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
+                            + CRLF
+                            + "Content-Length: " + content.toString().getBytes().length + CRLF // HEADER
+                            + CRLF // tells client were done with header
+                            + content.toString() // response body
+                            + CRLF + CRLF;
+                    outputStream.write(fullResponse.getBytes());
+                    outputStream.flush();
+                    // cache the response
 
-                String justTheUrl = trimUrl(urlString);                 // name cache file according to convention
-                String cachedFilePath = "res\\cache\\" + justTheUrl;      // construct path to cache file
+                    String justTheUrl = trimUrl(urlString);                 // name cache file according to convention
+                    String cachedFilePath = "res\\cache\\" + justTheUrl;      // construct path to cache file
 
-                if (expiryDate != null) {   // don't bother caching if we can't give an expiry date - will just be re-fetched regardless
-                    try {
+                    if (expiryDate != null) {   // don't bother caching if we can't give an expiry date - will just be re-fetched regardless
+                        try {
 
-                        File cacheFile = new File("res\\cache\\" + justTheUrl);
-                        ManagementConsole.printMgmtStyle("Writing to "+cacheFile.getCanonicalPath());
-                        if (cacheFile.createNewFile()) {                      // creates the file if it doesn't already exist
-                            System.out.println(this.toString()+" Creating cache file for \""+justTheUrl+"\" ... ");
-                        } else {
-                            System.out.println(this.toString()+" Overwriting cache file for \""+justTheUrl+"\"");
-                        }
-                        // write expiry date and response to file
+                            File cacheFile = new File("res\\cache\\" + justTheUrl);
+                            ManagementConsole.printMgmtStyle("Writing to " + cacheFile.getCanonicalPath());
+                            if (cacheFile.createNewFile()) {                      // creates the file if it doesn't already exist
+                                System.out.println(this.toString() + " Creating cache file for \"" + justTheUrl + "\" ... ");
+                            } else {
+                                System.out.println(this.toString() + " Overwriting cache file for \"" + justTheUrl + "\"");
+                            }
+                            // write expiry date and response to file
 //                        ManagementConsole.printMgmtStyle("HERE: "+expiryDate);
 
-                        FileWriter fw = new FileWriter(cacheFile, false);
-                        fw.write(expiryDate + System.lineSeparator());
-                        fw.write(content.toString() + System.lineSeparator());
-                        fw.flush();
-                        fw.close();
-                    } catch (IOException e) {
-                        System.out.println(this.toString() + " Error writing to cachefile for resource \"" + justTheUrl + "\"");
-                        e.printStackTrace();
+                            FileWriter fw = new FileWriter(cacheFile, false);
+                            fw.write(expiryDate + System.lineSeparator());
+                            fw.write(content.toString() + System.lineSeparator());
+                            fw.flush();
+                            fw.close();
+                        } catch (IOException e) {
+                            System.out.println(this.toString() + " Error writing to cachefile for resource \"" + justTheUrl + "\"");
+                            e.printStackTrace();
+                        }
                     }
+
+
+                } else {
+                    // TODO handle other status codes
                 }
 
-
-
-            } else {
-                // TODO handle other status codes
+            } catch (ProtocolException e) {
+                System.out.println(this.toString() + " experienced ProtocolException - check headers");
+                e.printStackTrace();
+            } catch (MalformedURLException e) {
+                System.out.println(this.toString() + " received malformed url: " + urlString);
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-
-        } catch (ProtocolException e) {
-            System.out.println(this.toString() + " experienced ProtocolException - check headers");
-            e.printStackTrace();
-        } catch (MalformedURLException e) {
-            System.out.println(this.toString() + " received malformed url: " + urlString);
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
         }
+    }
+
+    private boolean isImageType(String urlExtension) {
+        String local = urlExtension.toLowerCase();
+        return local.equals(JPG) ||
+                local.equals(JPEG) ||
+                local.equals(PNG) ||
+                local.equals(GIF);
     }
 
     // triggered as a response to a request for a blocked resource
@@ -439,8 +477,29 @@ public class ConnectionHandlerThread2 extends Thread {
         return justTheUrl;
     }
 
+    // need to disambiguate between image-type resources and text resources and handle appropriately
+    private String getResourceExtension(String url) {
+
+        int extStartIndex = url.lastIndexOf('.');
+        if (extStartIndex > -1 && extStartIndex != url.length()-1) {
+            String extension = url.substring(extStartIndex+1);
+            if (extension.contains(":")) {  // port
+                extension = extension.substring(0, extension.indexOf(':'));
+            }
+            return extension;
+        } else {
+            return null;
+        }
+    }
+
     @Override
     public String toString() {
         return "ConnectionHandlerThread2:" + id;
     }
 }
+
+// http request ->
+//      if url extension is .jpg, .gif, .jpeg, .png
+//          handle connection for image
+//      else
+//          handle connection for webpage (wgat we have)
