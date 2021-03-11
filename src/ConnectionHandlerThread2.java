@@ -104,6 +104,7 @@ public class ConnectionHandlerThread2 extends Thread {
 
             if (!endpointIsBlocked) {
                 String justTheUrl = trimUrl(endpointUrl);
+                String filenameForUrl = getCacheFilenameFromUrl(justTheUrl);    // get the encoded name
 
                 //System.out.println(justTheUrl);
 
@@ -116,7 +117,7 @@ public class ConnectionHandlerThread2 extends Thread {
 
                     String filename = curFile.getName();
                     ManagementConsole.printMgmtStyle(filename);
-                    if (filename.equals(justTheUrl)) {  // if it matches, it may not be in date
+                    if (filename.equals(filenameForUrl)) {  // if it matches, it may not be in date
                         if (isInDate(curFile)) {     // if it hasn't expired, don't send request to server and just send cached file
                             sendCached = true;
                             cachedFile = curFile;
@@ -298,21 +299,21 @@ public class ConnectionHandlerThread2 extends Thread {
                     outputStream.flush();
                     // cache the response
 
-                    String justTheUrl = trimUrl(urlString);                 // name cache file according to convention
-                    String cachedFilePath = "res\\cache\\" + justTheUrl;      // construct path to cache file
+                    String justTheUrl = trimUrl(urlString);
+                    String filenameFromUrl = getCacheFilenameFromUrl(justTheUrl); // name cache file according to convention
 
+                    // @Todo fix this for images
                     if (expiryDate != null) {   // don't bother caching if we can't give an expiry date - will just be re-fetched regardless
                         try {
 
-                            File cacheFile = new File("res\\cache\\" + justTheUrl);
+                            File cacheFile = new File("res\\cache\\" + filenameFromUrl);
                             ManagementConsole.printMgmtStyle("Writing to " + cacheFile.getCanonicalPath());
                             if (cacheFile.createNewFile()) {                      // creates the file if it doesn't already exist
-                                System.out.println(this.toString() + " Creating cache file for \"" + justTheUrl + "\" ... ");
+                                System.out.println(this.toString() + " Creating cache file for \"" + filenameFromUrl + "\" ("+justTheUrl+") ... ");
                             } else {
-                                System.out.println(this.toString() + " Overwriting cache file for \"" + justTheUrl + "\"");
+                                System.out.println(this.toString() + " Overwriting cache file for \"" + justTheUrl + "\" ("+justTheUrl+") ... ");
                             }
                             // write expiry date and response to file
-//                        ManagementConsole.printMgmtStyle("HERE: "+expiryDate);
 
                             FileWriter fw = new FileWriter(cacheFile, false);
                             fw.write(expiryDate + System.lineSeparator());
@@ -320,7 +321,7 @@ public class ConnectionHandlerThread2 extends Thread {
                             fw.flush();
                             fw.close();
                         } catch (IOException e) {
-                            System.out.println(this.toString() + " Error writing to cachefile for resource \"" + justTheUrl + "\"");
+                            System.out.println(this.toString() + " Error writing to cachefile for resource \"" + filenameFromUrl + "\" ("+justTheUrl+")");
                             e.printStackTrace();
                         }
                     }
@@ -429,6 +430,7 @@ public class ConnectionHandlerThread2 extends Thread {
         return false;   // if we can't parse an expiry date from the cache, re-fetch the resource to be safe.
     }
 
+    // @Todo make this work for images
     private void sendCachedFile(File cachedFile) {
 
         // file cached with format
