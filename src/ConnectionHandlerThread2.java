@@ -4,6 +4,8 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+// TODO: www.example.com gives expiry date, www.neverssl.com doesn't -> show how we don't bother caching neverssl.
+
 public class ConnectionHandlerThread2 extends Thread {
 
     private int port;
@@ -92,32 +94,38 @@ public class ConnectionHandlerThread2 extends Thread {
 
                 System.out.println(justTheUrl);
 
+                boolean sendCached = false;
+                File cachedFile = null;
+
                 // now check if its in cache before contacting URL
                 ArrayList<File> cacheFiles = getCacheFiles();
-                for (File cachedFile : cacheFiles) {
+                for (File curFile : cacheFiles) {
 
-                    String filename = cachedFile.getName();
+                    String filename = curFile.getName();
                     ManagementConsole.printMgmtStyle(filename);
                     if (filename.equals(justTheUrl)) {  // if it matches, it may not be in date
-                        if (isInDate(cachedFile)) {     // if it hasn't expired, don't send request to server and just send cached file
-                            sendCachedFile(cachedFile);
-                        } else {
-                            // Todo handle http request, cache response ADD BOOLEAN 'cache' TO handleHttpRequest() METHOD
-                            handleHttpRequest(endpointUrl);
+                        if (isInDate(curFile)) {     // if it hasn't expired, don't send request to server and just send cached file
+                            sendCached = true;
+                            cachedFile = curFile;
+                            break;
                         }
                     }
-                }   // if the http request hasn't been dealt with at this point, it hasn't been cached -> continue as normal
+                }
 
-                if (method.toLowerCase().equals("connect")) {   // https connect request
-                    handleHttpsRequest(endpointUrl);
-                } else if (method.toLowerCase().equals("get")) { // http get request
-                    handleHttpRequest(endpointUrl);
-                } else {    // only service GET and CONNECT
-                    sendNotImplementedResponse();
+                if (sendCached) {
+                    sendCachedFile(cachedFile);
+                } else {
+
+                    if (method.toLowerCase().equals("connect")) {   // https connect request
+                        handleHttpsRequest(endpointUrl);
+                    } else if (method.toLowerCase().equals("get")) { // http get request
+                        handleHttpRequest(endpointUrl);
+                    } else {    // only service GET and CONNECT
+                        sendNotImplementedResponse();
+                    }
                 }
 
             } else {
-                // TODO send bad request response
                 ManagementConsole.printMgmtStyle("Access to blocked site \"" + endpointUrl + "\" denied.\n" +
                         "\tIf this is unexpected, you may have blocked a parent resource -\n" +
                         "\tEnter \"BLOCKLIST\" to view your blocked sites. \n" +
@@ -195,7 +203,7 @@ public class ConnectionHandlerThread2 extends Thread {
 
 
             // check everything was okay ->
-//            System.out.println("---------\nRepsonse from "+urlString+":\n");
+            System.out.println("---------\nRepsonse from "+urlString+":\n");
 
             // get response code
             int responseCode = connection.getResponseCode();
@@ -233,9 +241,8 @@ public class ConnectionHandlerThread2 extends Thread {
                 builder.append("\n");
             }
 
-//            System.out.println(builder.toString());
-//            String responseStatusCode = connection.get
-            System.out.println("EXPIRY DATE: " + expiryDate);
+            System.out.println(builder.toString());
+            System.out.println("EXPIRY DATE FROM RESPONSE: " + expiryDate);
             System.out.println(content + "\n---------");
 
             String fullResponse = "";
@@ -259,7 +266,7 @@ public class ConnectionHandlerThread2 extends Thread {
                             System.out.println(this.toString()+" Overwriting cache file for \""+justTheUrl+"\"");
                         }
                         // write expiry date and response to file
-                        ManagementConsole.printMgmtStyle("HERE: "+expiryDate);
+//                        ManagementConsole.printMgmtStyle("HERE: "+expiryDate);
                         fw.write(expiryDate + System.lineSeparator());
                         fw.write(content.toString() + System.lineSeparator());
                         fw.flush();
