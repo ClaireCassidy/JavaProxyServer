@@ -1,5 +1,9 @@
 import java.io.*;
 import java.net.*;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class ConnectionHandlerThread2 extends Thread {
@@ -179,6 +183,9 @@ public class ConnectionHandlerThread2 extends Thread {
     }
 
     private void handleHttpRequest(String urlString){   // simple http get
+
+        String expiryDate = null;   // for caching purposes
+
         try {
             URL url = new URL(urlString);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();    // connect to endpoint
@@ -195,7 +202,7 @@ public class ConnectionHandlerThread2 extends Thread {
                 content.append(inputLine);
             }
 
-            String expiryDate = null;   // for caching purposes
+
 
             // check everything was okay ->
 //            System.out.println("---------\nRepsonse from "+urlString+":\n");
@@ -239,8 +246,8 @@ public class ConnectionHandlerThread2 extends Thread {
 
 //            System.out.println(builder.toString());
 //            String responseStatusCode = connection.get
-//            System.out.println("EXPIRY DATE: "+expiryDate);
-//            System.out.println(content+"\n---------");
+            System.out.println("EXPIRY DATE: "+expiryDate);
+            System.out.println(content+"\n---------");
 
             String fullResponse = "";
             // given good response code, contents is what we want to send back
@@ -325,16 +332,30 @@ public class ConnectionHandlerThread2 extends Thread {
 
         try {
             Scanner sc = new Scanner(cachedFile);
+            String expiryDate = null;
             if (sc.hasNextLine()) { // just need the first line
-                String expiryDate = sc.nextLine();
-                System.out.println(expiryDate);
+                expiryDate = sc.nextLine();
+                System.out.println("EXPIRY DATE FROM CACHE: "+expiryDate);
+
+//                SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
+//                Date d = format.parse(expiryDate);  // returns null if invalid format
+                ZonedDateTime expiryZdt = ZonedDateTime.parse(expiryDate, DateTimeFormatter.RFC_1123_DATE_TIME);
+                ZonedDateTime nowZdt = ZonedDateTime.now();
+                long diff = expiryZdt.compareTo(nowZdt);
+                System.out.println("DIFF: "+diff);  // diff == 1 if expiryZdt in future, diff = -1 if its expired, diff == 0 if its the same
+                if (diff < 1) { // i.e. expired or expires now
+                    return false;
+                } else return true;
             }
-        } catch (Exception e) {
-            System.out.println(this.toString()+" Error getting date from Cached File \""+cachedFile.getName()+"\". Check file format.");
+        } catch (FileNotFoundException e) {
+            System.out.println(this.toString()+" Unexpected error encountered opening Cached File \""+cachedFile.getName()+"\".");
+            e.printStackTrace();
+        } catch (Exception e) { // catch date parse errors
+            System.out.println(this.toString()+" Invalid date format in file \""+cachedFile.getName()+"\"");
             e.printStackTrace();
         }
 
-        return false;
+        return false;   // if we can't parse an expiry date from the cache, re-fetch the resource.
     }
 
 
