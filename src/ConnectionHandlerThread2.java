@@ -21,6 +21,8 @@ public class ConnectionHandlerThread2 extends Thread {
     final String FORBIDDEN_CODE = "403";
     final String NOT_IMPLEMENTED = "NOT IMPLEMENTED";
     final String NOT_IMPLEMENTED_CODE = "501";
+    final String OK = "OK";
+    final String OK_CODE = "200";
 
     public ConnectionHandlerThread2(Socket incoming) throws IOException {
 
@@ -109,8 +111,8 @@ public class ConnectionHandlerThread2 extends Thread {
                     String filename = cachedFile.getName();
                     ManagementConsole.printMgmtStyle(filename);
                     if (filename.equals(justTheUrl)) {  // if it matches, it may not be in date
-                        if (isInDate(cachedFile)) {
-//                            sendCachedFile();
+                        if (isInDate(cachedFile)) {     // if it hasn't expired, don't send request to server and just send cached file
+                            sendCachedFile(cachedFile);
                         } else {
                             // Todo handle http request, cache response ADD BOOLEAN 'cache' TO handleHttpRequest() METHOD
                         }
@@ -182,7 +184,7 @@ public class ConnectionHandlerThread2 extends Thread {
         // @Todo
     }
 
-    private void handleHttpRequest(String urlString){   // simple http get
+    private void handleHttpRequest(String urlString){   // simple http get (non-cached)
 
         String expiryDate = null;   // for caching purposes
 
@@ -326,12 +328,10 @@ public class ConnectionHandlerThread2 extends Thread {
         System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         // file cached with format
         // 1    EXPIRY_DATE
-        // 2    FILE_CONTENTS ...
-        // 3    ...
-        // 4    ...
+        // 2    HTML etc.   (one line)
 
-        try {
-            Scanner sc = new Scanner(cachedFile);
+
+        try (Scanner sc = new Scanner(cachedFile)) {    // ensure resource is closed
             String expiryDate = null;
             if (sc.hasNextLine()) { // just need the first line
                 expiryDate = sc.nextLine();
@@ -355,7 +355,43 @@ public class ConnectionHandlerThread2 extends Thread {
             e.printStackTrace();
         }
 
-        return false;   // if we can't parse an expiry date from the cache, re-fetch the resource.
+        return false;   // if we can't parse an expiry date from the cache, re-fetch the resource to be safe.
+    }
+
+    public void sendCachedFile(File cachedFile) {
+
+        // file cached with format
+        // 1    EXPIRY_DATE
+        // 2    HTML etc.   (one line)
+        System.out.println("Sending cached version of \""+cachedFile.getName()+"\" ...");
+        String resource = null;
+
+        try (Scanner sc = new Scanner(cachedFile)) {    // ensure resource is closed
+            if (sc.hasNextLine()) sc.nextLine();    // skip expiry date line
+            if (sc.hasNextLine()) {
+                resource = sc.nextLine();
+                System.out.println("\tCACHED RESOURCE FOR \""+cachedFile.getName()+"\": \n\t"+resource);
+
+                String fullResponse = "HTTP/1.1 "+OK_CODE+" "+OK // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
+                        + CRLF
+                        + "Content-Length: " + resource.toString().getBytes().length + CRLF // HEADER
+                        + CRLF // tells client were done with header
+                        + resource // response body
+                        + CRLF + CRLF;
+
+                outputStream.write(fullResponse.getBytes());
+                outputStream.flush();
+            }
+
+
+        } catch (FileNotFoundException e) {
+            System.out.println(this.toString()+" Unexpected error encountered opening Cached File \""+cachedFile.getName()+"\".");
+            e.printStackTrace();
+        } catch (IOException e) {
+            System.out.println(this.toString()+" Error writing cached resource to client.");
+            e.printStackTrace();
+        }
+
     }
 
 
