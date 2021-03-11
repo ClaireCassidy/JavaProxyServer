@@ -1,7 +1,5 @@
 import java.io.*;
 import java.net.*;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -37,13 +35,13 @@ public class ConnectionHandlerThread2 extends Thread {
     private synchronized void setId() {
         global_id++;
         id = global_id;
-        System.out.println("Established ConnectionHandlerThread:"+id);
+        System.out.println("Established ConnectionHandlerThread:" + id);
         System.out.println("\tClient info: " + incoming.toString());
     }
 
     @Override
     public void run() {
-        System.out.println(this.toString()+" RUNNING");
+        System.out.println(this.toString() + " RUNNING");
 
         // 1. accept incoming request
         // 2. check if its http or https
@@ -69,7 +67,7 @@ public class ConnectionHandlerThread2 extends Thread {
             String method = getMethod(request);
             String endpointUrl = getURL(request);
 
-            System.out.println(this.toString()+" wants to "+method+" "+endpointUrl);
+            System.out.println(this.toString() + " wants to " + method + " " + endpointUrl);
 
             // check resource not on blocklist
             ArrayList<String> blockedSites = ManagementConsole.getBlockedSites();
@@ -77,7 +75,7 @@ public class ConnectionHandlerThread2 extends Thread {
 
 //            System.out.println("printing blocked sites: ...");
             if (blockedSites != null) {
-                for (String site:blockedSites) {
+                for (String site : blockedSites) {
                     System.out.println(site);
                     // capture "www.youtube.com/..." as well as "www.youtube.com"
                     if (endpointUrl.toLowerCase().contains(site.toLowerCase())) {
@@ -90,23 +88,13 @@ public class ConnectionHandlerThread2 extends Thread {
 
 
             if (!endpointIsBlocked) {
-                String justTheUrl = endpointUrl;
-
-                if (endpointUrl.startsWith("https")) {
-                    justTheUrl = endpointUrl.substring(8);
-                } else if (endpointUrl.startsWith("http")) {
-                    justTheUrl = endpointUrl.substring(7);
-                }
-
-                if (justTheUrl.endsWith("/")) {
-                    justTheUrl = justTheUrl.substring(0,justTheUrl.length()-1); // trim trailing '/'
-                }
+                String justTheUrl = trimUrl(endpointUrl);
 
                 System.out.println(justTheUrl);
 
                 // now check if its in cache before contacting URL
                 ArrayList<File> cacheFiles = getCacheFiles();
-                for (File cachedFile:cacheFiles) {
+                for (File cachedFile : cacheFiles) {
 
                     String filename = cachedFile.getName();
                     ManagementConsole.printMgmtStyle(filename);
@@ -115,6 +103,7 @@ public class ConnectionHandlerThread2 extends Thread {
                             sendCachedFile(cachedFile);
                         } else {
                             // Todo handle http request, cache response ADD BOOLEAN 'cache' TO handleHttpRequest() METHOD
+                            handleHttpRequest(endpointUrl);
                         }
                     }
                 }   // if the http request hasn't been dealt with at this point, it hasn't been cached -> continue as normal
@@ -129,8 +118,8 @@ public class ConnectionHandlerThread2 extends Thread {
 
             } else {
                 // TODO send bad request response
-                ManagementConsole.printMgmtStyle("Access to blocked site \""+endpointUrl+"\" denied.\n" +
-                        "\tIf this is unexpected, you may have blocked a parent resource -\n"+
+                ManagementConsole.printMgmtStyle("Access to blocked site \"" + endpointUrl + "\" denied.\n" +
+                        "\tIf this is unexpected, you may have blocked a parent resource -\n" +
                         "\tEnter \"BLOCKLIST\" to view your blocked sites. \n" +
                         "\tEnter \"UNBLOCK [site]\" to access.");
 
@@ -138,7 +127,7 @@ public class ConnectionHandlerThread2 extends Thread {
             }
 
         } catch (IOException e) {
-            System.out.println("IOException in ConnectionHandlerThread "+id);
+            System.out.println("IOException in ConnectionHandlerThread " + id);
             e.printStackTrace();
         }
     }
@@ -155,7 +144,7 @@ public class ConnectionHandlerThread2 extends Thread {
             method = methodLineTokens[0];
 
         } catch (Exception e) {
-            System.out.println(this.toString()+" Error parsing request method type - invalid format?");
+            System.out.println(this.toString() + " Error parsing request method type - invalid format?");
         } finally {
             return method;
         }
@@ -170,10 +159,10 @@ public class ConnectionHandlerThread2 extends Thread {
 
             String methodLine = requestLines[0];    // get first line
             String[] methodLineTokens = methodLine.split(" ");  // get the individual tokens
-            endpoint= methodLineTokens[1];
+            endpoint = methodLineTokens[1];
 
         } catch (Exception e) {
-            System.out.println(this.toString()+" Error parsing endpoint URL - invalid format?");
+            System.out.println(this.toString() + " Error parsing endpoint URL - invalid format?");
         } finally {
             return endpoint;
         }
@@ -184,7 +173,7 @@ public class ConnectionHandlerThread2 extends Thread {
         // @Todo
     }
 
-    private void handleHttpRequest(String urlString){   // simple http get (non-cached)
+    private void handleHttpRequest(String urlString) {   // simple http get (non-cached)
 
         String expiryDate = null;   // for caching purposes
 
@@ -205,7 +194,6 @@ public class ConnectionHandlerThread2 extends Thread {
             }
 
 
-
             // check everything was okay ->
 //            System.out.println("---------\nRepsonse from "+urlString+":\n");
 
@@ -221,11 +209,10 @@ public class ConnectionHandlerThread2 extends Thread {
 
             // get headers
             Map<String, List<String>> map = connection.getHeaderFields();
-            for (Map.Entry<String, List<String>> entry : map.entrySet())
-            {
+            for (Map.Entry<String, List<String>> entry : map.entrySet()) {
                 if (entry.getKey() == null)
                     continue;
-                builder.append( entry.getKey())
+                builder.append(entry.getKey())
                         .append(": ");
 
                 if (entry.getKey().toLowerCase().equals("expires")) {
@@ -248,14 +235,40 @@ public class ConnectionHandlerThread2 extends Thread {
 
 //            System.out.println(builder.toString());
 //            String responseStatusCode = connection.get
-            System.out.println("EXPIRY DATE: "+expiryDate);
-            System.out.println(content+"\n---------");
+            System.out.println("EXPIRY DATE: " + expiryDate);
+            System.out.println(content + "\n---------");
 
             String fullResponse = "";
+
             // given good response code, contents is what we want to send back
             if (responseCode >= 200 && responseCode < 300) { // alles gut
 
-                fullResponse = "HTTP/1.1 "+responseCode+" "+responseMsg // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
+                // cache the response
+
+                String justTheUrl = trimUrl(urlString);                 // name cache file according to convention
+                String cachedFilePath = "res\\cache\\" + justTheUrl;      // construct path to cache file
+
+                if (expiryDate != null) {   // don't bother caching if we can't give an expiry date - will just be re-fetched regardless
+                    try (FileWriter fw = new FileWriter(cachedFilePath, false)) {      // close resources
+
+                        File cacheFile = new File("res\\cache\\" + justTheUrl);
+                        ManagementConsole.printMgmtStyle("Writing to "+cacheFile.getCanonicalPath());
+                        if (cacheFile.createNewFile()) {                      // creates the file if it doesn't already exist
+                            System.out.println(this.toString()+" Creating cache file for \""+justTheUrl+"\" ... ");
+                        } else {
+                            System.out.println(this.toString()+" Overwriting cache file for \""+justTheUrl+"\"");
+                        }
+                        // write expiry date and response to file
+                        ManagementConsole.printMgmtStyle("HERE: "+expiryDate);
+                        fw.write(expiryDate + System.lineSeparator());
+                        fw.write(content.toString() + System.lineSeparator());
+                        fw.flush();
+                    } catch (IOException e) {
+                        System.out.println(this.toString() + " Error writing to cachefile for resource \"" + justTheUrl + "\"");
+                    }
+                }
+
+                fullResponse = "HTTP/1.1 " + responseCode + " " + responseMsg // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
                         + CRLF
                         + "Content-Length: " + content.toString().getBytes().length + CRLF // HEADER
                         + CRLF // tells client were done with header
@@ -269,10 +282,10 @@ public class ConnectionHandlerThread2 extends Thread {
             }
 
         } catch (ProtocolException e) {
-            System.out.println(this.toString()+" experienced ProtocolException - check headers");
+            System.out.println(this.toString() + " experienced ProtocolException - check headers");
             e.printStackTrace();
         } catch (MalformedURLException e) {
-            System.out.println(this.toString()+" received malformed url: "+urlString);
+            System.out.println(this.toString() + " received malformed url: " + urlString);
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
@@ -282,7 +295,7 @@ public class ConnectionHandlerThread2 extends Thread {
     // triggered as a response to a request for a blocked resource
     private void sendHttpForbidden() throws IOException {
         System.out.println("Sending forbidden...");
-        String fullResponse = "HTTP/1.1 "+FORBIDDEN_CODE+" "+FORBIDDEN // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
+        String fullResponse = "HTTP/1.1 " + FORBIDDEN_CODE + " " + FORBIDDEN // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
                 + CRLF // HEADER
                 + CRLF // tells client were done with header
                 + CRLF + CRLF;
@@ -294,7 +307,7 @@ public class ConnectionHandlerThread2 extends Thread {
     // triggered as a response to a non-GET or non-CONNECT method type in request
     private void sendNotImplementedResponse() throws IOException {
         System.out.println("Sending not implemented...");
-        String fullResponse = "HTTP/1.1 "+NOT_IMPLEMENTED_CODE+" "+NOT_IMPLEMENTED// [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
+        String fullResponse = "HTTP/1.1 " + NOT_IMPLEMENTED_CODE + " " + NOT_IMPLEMENTED// [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
                 + CRLF // HEADER
                 + CRLF // tells client were done with header
                 + CRLF + CRLF;
@@ -304,24 +317,24 @@ public class ConnectionHandlerThread2 extends Thread {
 
     private ArrayList<File> getCacheFiles() {
 
-        ArrayList<File> filenames = new ArrayList<>();
+        ArrayList<File> files = new ArrayList<>();
 
         try {
             File cacheDir = new File("res\\cache");     // file representing the directory
             File[] cacheFiles = cacheDir.listFiles();
 
-            for (File cacheFile:cacheFiles) {   // copy to arraylist
+            for (File cacheFile : cacheFiles) {   // copy to arraylist
                 if (cacheFile.isFile()) {   // ignore subdirectories
-                    filenames.add(cacheFile);
+                    files.add(cacheFile);
 //                    System.out.println(cacheFile.getName());
                 }
             }
         } catch (Exception e) {
-            System.out.println(this.toString()+" Experienced error retrieving cache files - check path");
+            System.out.println(this.toString() + " Experienced error retrieving cache files - check path");
             e.printStackTrace();
         }
 
-        return filenames;
+        return files;
     }
 
     private boolean isInDate(File cachedFile) {
@@ -335,44 +348,44 @@ public class ConnectionHandlerThread2 extends Thread {
             String expiryDate = null;
             if (sc.hasNextLine()) { // just need the first line
                 expiryDate = sc.nextLine();
-                System.out.println("EXPIRY DATE FROM CACHE: "+expiryDate);
+                System.out.println("EXPIRY DATE FROM CACHE: " + expiryDate);
 
 //                SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
 //                Date d = format.parse(expiryDate);  // returns null if invalid format
                 ZonedDateTime expiryZdt = ZonedDateTime.parse(expiryDate, DateTimeFormatter.RFC_1123_DATE_TIME);
                 ZonedDateTime nowZdt = ZonedDateTime.now();
                 long diff = expiryZdt.compareTo(nowZdt);
-                System.out.println("DIFF: "+diff);  // diff == 1 if expiryZdt in future, diff = -1 if its expired, diff == 0 if its the same
+                System.out.println("DIFF: " + diff);  // diff == 1 if expiryZdt in future, diff = -1 if its expired, diff == 0 if its the same
                 if (diff < 1) { // i.e. expired or expires now
                     return false;
                 } else return true;
             }
         } catch (FileNotFoundException e) {
-            System.out.println(this.toString()+" Unexpected error encountered opening Cached File \""+cachedFile.getName()+"\".");
+            System.out.println(this.toString() + " Unexpected error encountered opening Cached File \"" + cachedFile.getName() + "\".");
             e.printStackTrace();
         } catch (Exception e) { // catch date parse errors
-            System.out.println(this.toString()+" Invalid date format in file \""+cachedFile.getName()+"\"");
+            System.out.println(this.toString() + " Invalid date format in file \"" + cachedFile.getName() + "\"");
             e.printStackTrace();
         }
 
         return false;   // if we can't parse an expiry date from the cache, re-fetch the resource to be safe.
     }
 
-    public void sendCachedFile(File cachedFile) {
+    private void sendCachedFile(File cachedFile) {
 
         // file cached with format
         // 1    EXPIRY_DATE
         // 2    HTML etc.   (one line)
-        System.out.println("Sending cached version of \""+cachedFile.getName()+"\" ...");
+        System.out.println("Sending cached version of \"" + cachedFile.getName() + "\" ...");
         String resource = null;
 
         try (Scanner sc = new Scanner(cachedFile)) {    // ensure resource is closed
             if (sc.hasNextLine()) sc.nextLine();    // skip expiry date line
             if (sc.hasNextLine()) {
                 resource = sc.nextLine();
-                System.out.println("\tCACHED RESOURCE FOR \""+cachedFile.getName()+"\": \n\t"+resource);
+                System.out.println("\tCACHED RESOURCE FOR \"" + cachedFile.getName() + "\": \n\t" + resource);
 
-                String fullResponse = "HTTP/1.1 "+OK_CODE+" "+OK // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
+                String fullResponse = "HTTP/1.1 " + OK_CODE + " " + OK // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
                         + CRLF
                         + "Content-Length: " + resource.toString().getBytes().length + CRLF // HEADER
                         + CRLF // tells client were done with header
@@ -385,18 +398,33 @@ public class ConnectionHandlerThread2 extends Thread {
 
 
         } catch (FileNotFoundException e) {
-            System.out.println(this.toString()+" Unexpected error encountered opening Cached File \""+cachedFile.getName()+"\".");
+            System.out.println(this.toString() + " Unexpected error encountered opening Cached File \"" + cachedFile.getName() + "\".");
             e.printStackTrace();
         } catch (IOException e) {
-            System.out.println(this.toString()+" Error writing cached resource to client.");
+            System.out.println(this.toString() + " Error writing cached resource to client.");
             e.printStackTrace();
         }
 
     }
 
+    private String trimUrl(String rawUrl) { // trims unecessary stuff from request url so that it can be effectively matched to cache files
+        String justTheUrl = rawUrl;
+
+        if (rawUrl.startsWith("https")) {
+            justTheUrl = rawUrl.substring(8);
+        } else if (rawUrl.startsWith("http")) {
+            justTheUrl = rawUrl.substring(7);
+        }
+
+        if (justTheUrl.endsWith("/")) {
+            justTheUrl = justTheUrl.substring(0, justTheUrl.length() - 1); // trim trailing '/'
+        }
+
+        return justTheUrl;
+    }
 
     @Override
-    public String toString () {
-        return "ConnectionHandlerThread2:"+id;
+    public String toString() {
+        return "ConnectionHandlerThread2:" + id;
     }
 }
