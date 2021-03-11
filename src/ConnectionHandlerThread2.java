@@ -146,10 +146,13 @@ public class ConnectionHandlerThread2 extends Thread {
                 sendHttpForbidden();
             }
 
+            incoming.close();
         } catch (IOException e) {
             System.out.println("IOException in ConnectionHandlerThread " + id);
             e.printStackTrace();
         }
+
+
     }
 
     // Takes a raw http request and attempts to extract the method
