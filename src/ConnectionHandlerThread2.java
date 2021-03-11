@@ -5,6 +5,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 // TODO: www.example.com gives expiry date, www.neverssl.com doesn't -> show how we don't bother caching neverssl.
+// www.httpforever.com
+// TODO: had issue: https://support.mozilla.org/en-US/questions/1313356
+// TODO: "proxy server is refusing connections" -> either the program isn't running or a resource is on a blocked site
 
 public class ConnectionHandlerThread2 extends Thread {
 
@@ -92,7 +95,7 @@ public class ConnectionHandlerThread2 extends Thread {
             if (!endpointIsBlocked) {
                 String justTheUrl = trimUrl(endpointUrl);
 
-                System.out.println(justTheUrl);
+                //System.out.println(justTheUrl);
 
                 boolean sendCached = false;
                 File cachedFile = null;
@@ -250,13 +253,22 @@ public class ConnectionHandlerThread2 extends Thread {
             // given good response code, contents is what we want to send back
             if (responseCode >= 200 && responseCode < 300) { // alles gut
 
+
+                fullResponse = "HTTP/1.1 " + responseCode + " " + responseMsg // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
+                        + CRLF
+                        + "Content-Length: " + content.toString().getBytes().length + CRLF // HEADER
+                        + CRLF // tells client were done with header
+                        + content.toString() // response body
+                        + CRLF + CRLF;
+                outputStream.write(fullResponse.getBytes());
+                outputStream.flush();
                 // cache the response
 
                 String justTheUrl = trimUrl(urlString);                 // name cache file according to convention
                 String cachedFilePath = "res\\cache\\" + justTheUrl;      // construct path to cache file
 
                 if (expiryDate != null) {   // don't bother caching if we can't give an expiry date - will just be re-fetched regardless
-                    try (FileWriter fw = new FileWriter(cachedFilePath, false)) {      // close resources
+                    try {
 
                         File cacheFile = new File("res\\cache\\" + justTheUrl);
                         ManagementConsole.printMgmtStyle("Writing to "+cacheFile.getCanonicalPath());
@@ -267,22 +279,19 @@ public class ConnectionHandlerThread2 extends Thread {
                         }
                         // write expiry date and response to file
 //                        ManagementConsole.printMgmtStyle("HERE: "+expiryDate);
+
+                        FileWriter fw = new FileWriter(cacheFile, false);
                         fw.write(expiryDate + System.lineSeparator());
                         fw.write(content.toString() + System.lineSeparator());
                         fw.flush();
+                        fw.close();
                     } catch (IOException e) {
                         System.out.println(this.toString() + " Error writing to cachefile for resource \"" + justTheUrl + "\"");
+                        e.printStackTrace();
                     }
                 }
 
-                fullResponse = "HTTP/1.1 " + responseCode + " " + responseMsg // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
-                        + CRLF
-                        + "Content-Length: " + content.toString().getBytes().length + CRLF // HEADER
-                        + CRLF // tells client were done with header
-                        + content.toString() // response body
-                        + CRLF + CRLF;
-                outputStream.write(fullResponse.getBytes());
-                outputStream.flush();
+
 
             } else {
                 // TODO handle other status codes
