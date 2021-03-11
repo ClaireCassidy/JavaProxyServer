@@ -28,6 +28,7 @@ public class ConnectionHandlerThread2 extends Thread {
     final String NOT_IMPLEMENTED_CODE = "501";
     final String OK = "OK";
     final String OK_CODE = "200";
+    final String CONNECTION_ESTABLISHED = "CONNECTION ESTABLISHED";
 
     final String JPG = "jpg";
     final String JPEG = "jpeg";
@@ -116,7 +117,7 @@ public class ConnectionHandlerThread2 extends Thread {
                 for (File curFile : cacheFiles) {
 
                     String filename = curFile.getName();
-                    ManagementConsole.printMgmtStyle(filename);
+//                    ManagementConsole.printMgmtStyle(filename);
                     if (filename.equals(filenameForUrl)) {  // if it matches, it may not be in date
                         if (isInDate(curFile)) {     // if it hasn't expired, don't send request to server and just send cached file
                             sendCached = true;
@@ -196,6 +197,63 @@ public class ConnectionHandlerThread2 extends Thread {
     private void handleHttpsRequest(String urlString) {
         // establish tunnel
         // @Todo
+
+        /*
+        The most common form of HTTP tunneling is the standardized HTTP CONNECT method.[1][2]
+        In this mechanism, the client asks an HTTP proxy server to forward the TCP connection
+        to the desired destination. The server then proceeds to make the connection on behalf
+        of the client. Once the connection has been established by the server, the proxy server
+        continues to proxy the TCP stream to and from the client. Only the initial connection
+        request is HTTP - after that, the server simply proxies the established TCP connection.
+        This mechanism is how a client behind an HTTP proxy can access websites using SSL or
+        TLS (i.e. HTTPS).
+        */
+
+        ManagementConsole.printMgmtStyle("ITS A HTTPS CONNECT REQUEST");
+
+        // extract endpoint target port from url:
+
+        String[] urlComponents = urlString.split(":");
+        String urlItself = urlComponents[0];
+        int endpointPort = Integer.parseInt(urlComponents[1]);
+
+        try {
+            sendConnectionEst();
+
+            // set up connection to endpoint
+            ManagementConsole.printMgmtStyle("URL STRING: " + urlString);
+            Socket endpointSocket = new Socket(urlItself, endpointPort);
+
+            // link from client to endpoint
+            Thread clientToEndpointThread = new HttpsConnectorThread();
+            clientToEndpointThread.start();
+
+            // link from endpoint to client
+            Thread endpointToClientThread = new HttpsConnectorThread();
+            clientToEndpointThread.start();
+
+            // wait for them to finish before continuing
+            clientToEndpointThread.join();
+            endpointToClientThread.join();
+
+            endpointSocket.close();
+
+        } catch (UnknownHostException e) {
+            System.out.println(this.toString() + " Unable to connect to HTTPS host "+urlItself);
+            e.printStackTrace();
+        } catch (IOException e) {
+            System.out.println(this.toString() + " IOException when connecting to HTTPS "+urlItself);
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            System.out.println(this.toString() + " HttpsConnectorThreads died unexpectedly");
+            e.printStackTrace();
+        }
+    }
+
+    private void sendConnectionEst() {
+        String response = "HTTP/1.1 " + OK_CODE + " " + CONNECTION_ESTABLISHED
+                + CRLF + CRLF;
+
     }
 
     private void handleHttpRequest(String urlString) {   // simple http get (non-cached)
