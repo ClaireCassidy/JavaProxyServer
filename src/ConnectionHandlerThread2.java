@@ -7,7 +7,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 // TODO: www.example.com gives expiry date, www.neverssl.com doesn't -> show how we don't bother caching neverssl.
-// www.httpforever.com
 // TODO: had issue: https://support.mozilla.org/en-US/questions/1313356
 // TODO: "proxy server is refusing connections" -> either the program isn't running or a resource is on a blocked site
 
@@ -29,6 +28,8 @@ public class ConnectionHandlerThread2 extends Thread {
     final String OK = "OK";
     final String OK_CODE = "200";
     final String CONNECTION_ESTABLISHED = "CONNECTION ESTABLISHED";
+    final String NOT_FOUND = "NOT FOUND";
+    final String NOT_FOUND_CODE = "404";
 
     final String JPG = "jpg";
     final String JPEG = "jpeg";
@@ -146,9 +147,11 @@ public class ConnectionHandlerThread2 extends Thread {
                         "\tEnter \"BLOCKLIST\" to view your blocked sites. \n" +
                         "\tEnter \"UNBLOCK [site]\" to access.");
 
-                sendHttpForbidden();
+                sendForbidden();
             }
 
+            inputStream.close();
+            outputStream.close();
             incoming.close();
         } catch (IOException e) {
             System.out.println("IOException in ConnectionHandlerThread " + id);
@@ -223,14 +226,20 @@ public class ConnectionHandlerThread2 extends Thread {
             // set up connection to endpoint
             ManagementConsole.printMgmtStyle("URL STRING: " + urlString);
             Socket endpointSocket = new Socket(urlItself, endpointPort);
+            endpointSocket.setSoTimeout(3000);
+
+            InputStream endpointSocketIn = endpointSocket.getInputStream();
+            OutputStream endpointSocketOut = endpointSocket.getOutputStream();
 
             // link from client to endpoint
-            Thread clientToEndpointThread = new HttpsConnectorThread();
+            // Needs endpointSocket's inputStream, incoming's outputStream
+            Thread clientToEndpointThread = new HttpsConnectorThread(endpointSocketIn, outputStream);
             clientToEndpointThread.start();
 
             // link from endpoint to client
-            Thread endpointToClientThread = new HttpsConnectorThread();
-            clientToEndpointThread.start();
+            // Needs incoming's input stream, endpointSocket's outputStream
+            Thread endpointToClientThread = new HttpsConnectorThread(inputStream, endpointSocketOut);
+            endpointToClientThread.start();
 
             // wait for them to finish before continuing
             clientToEndpointThread.join();
@@ -245,15 +254,17 @@ public class ConnectionHandlerThread2 extends Thread {
             System.out.println(this.toString() + " IOException when connecting to HTTPS "+urlItself);
             e.printStackTrace();
         } catch (InterruptedException e) {
-            System.out.println(this.toString() + " HttpsConnectorThreads died unexpectedly");
             e.printStackTrace();
         }
     }
 
-    private void sendConnectionEst() {
+    private void sendConnectionEst() throws IOException {
         String response = "HTTP/1.1 " + OK_CODE + " " + CONNECTION_ESTABLISHED
+                + CRLF // HEADER
+                + CRLF // tells client were done with header
                 + CRLF + CRLF;
-
+        outputStream.write(response.getBytes());
+        outputStream.flush();
     }
 
     private void handleHttpRequest(String urlString) {   // simple http get (non-cached)
@@ -272,6 +283,8 @@ public class ConnectionHandlerThread2 extends Thread {
                             + CRLF + CRLF;
                     outputStream.write(responseHeader.getBytes());
                     ImageIO.write(imgResource, urlExtension, outputStream);
+                } else {
+                    sendNotFound(); // couldn't fetch the resource, so send user a 404
                 }
 
             } catch (MalformedURLException e) {
@@ -360,7 +373,6 @@ public class ConnectionHandlerThread2 extends Thread {
                     String justTheUrl = trimUrl(urlString);
                     String filenameFromUrl = getCacheFilenameFromUrl(justTheUrl); // name cache file according to convention
 
-                    // @Todo fix this for images
                     if (expiryDate != null) {   // don't bother caching if we can't give an expiry date - will just be re-fetched regardless
                         try {
 
@@ -401,6 +413,17 @@ public class ConnectionHandlerThread2 extends Thread {
         }
     }
 
+    // sent when a request is a received for an image that can't be sourced, etc.
+    private void sendNotFound() throws IOException {
+        System.out.println("Sending not found ...");
+        String fullResponse = "HTTP/1.1 " + NOT_FOUND_CODE + " " + NOT_FOUND // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
+                + CRLF // HEADER
+                + CRLF // tells client were done with header
+                + CRLF + CRLF;
+        outputStream.write(fullResponse.getBytes());
+        outputStream.flush();
+    }
+
     private boolean isImageType(String urlExtension) {
         String local = urlExtension.toLowerCase();
         return local.equals(JPG) ||
@@ -410,7 +433,7 @@ public class ConnectionHandlerThread2 extends Thread {
     }
 
     // triggered as a response to a request for a blocked resource
-    private void sendHttpForbidden() throws IOException {
+    private void sendForbidden() throws IOException {
         System.out.println("Sending forbidden...");
         String fullResponse = "HTTP/1.1 " + FORBIDDEN_CODE + " " + FORBIDDEN // [HTTP_VERSION] [RESPONSE_CODE] [RESPONSE_MESSAGE]
                 + CRLF // HEADER
@@ -488,7 +511,6 @@ public class ConnectionHandlerThread2 extends Thread {
         return false;   // if we can't parse an expiry date from the cache, re-fetch the resource to be safe.
     }
 
-    // @Todo make this work for images
     private void sendCachedFile(File cachedFile) {
 
         // file cached with format

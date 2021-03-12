@@ -16,6 +16,7 @@ public class ManagementConsole implements Runnable {
     public static final String ANSI_RESET = "\u001B[0m";
     private static final String INSTRUCTIONS = "Enter a command to configure the Proxy Server:\n"+
             "\tBLOCK [url] \t\t- block the specified URL\n"+
+            "\tUNBLOCK [url] \t\t- remove URL from blocklist\n"+
             "\tHELP \t\t\t\t- print this message again\n"+
             "\tQUIT \t\t\t\t- save blocked/cache config and safely exit program\n"+
             "\tBLOCKLIST \t\t\t- print list of blocked sites";
