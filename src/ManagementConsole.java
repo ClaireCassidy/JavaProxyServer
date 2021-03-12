@@ -25,26 +25,49 @@ public class ManagementConsole implements Runnable {
     public ManagementConsole() throws IOException {
         // open blocked sites file
 
+
+        // create blocked.txt if doesn't exist
         File blockedSitesFile = new File("res\\blocked.txt");
-        File cacheFile = new File("res\\cache.csv");
+        if (!blockedSitesFile.getParentFile().exists()) {
+            if (blockedSitesFile.getParentFile().mkdirs()) {
+                printMgmtStyle("Successfully created directory \"res\".");// create 'res' dir if doesn't exist)
+            } else {
+                printMgmtStyle("Error creating directory \"res\".");
+                throw new IOException();
+            }
+        }
+
+        // create res/cache if doesn't exist
+        File cacheDir = new File("res\\cache");
+        if (!cacheDir.exists()) {
+            if (cacheDir.mkdir()) {
+                printMgmtStyle("Successfully created directory \"res\\cache\".");
+            } else {
+                printMgmtStyle("Error creating directory \"res\".");
+                throw new IOException();
+            }
+        }
+
+        blockedSitesFile.getParentFile().mkdir();
 
         // load the blocked sites into memory
         try {
-            if (blockedSitesFile.exists()) {
-                Scanner sc = new Scanner(blockedSitesFile);     //file to be scanned
-                blockedSitesInstance = new ArrayList<>();
-
-                printMgmtStyle("Blocked:");
-
-                String site;
-                while (sc.hasNextLine()) {
-                    site = sc.nextLine();
-                    printMgmtStyle(site);
-                    blockedSitesInstance.add(site); // update dynamic blocked sites
-                }
-            } else {
-                printMgmtStyle(this.toString()+"Couldn't find blocked sites file - check path");
+            if (!blockedSitesFile.exists()) {
+                printMgmtStyle(this.toString() + "Couldn't find blocked sites file - Creating ...");
+                blockedSitesFile.createNewFile();
+                printMgmtStyle("Created \"res/blocked.txt\"");
             }
+
+
+            Scanner sc = new Scanner(blockedSitesFile);     //file to be scanned
+            blockedSitesInstance = new ArrayList<>();
+
+            String site;
+            while (sc.hasNextLine()) {
+                site = sc.nextLine();
+                blockedSitesInstance.add(site); // update dynamic blocked sites
+            }
+
         } catch (FileNotFoundException e) {
             printMgmtStyle(this.toString()+"Failed to open blocked sites file");
 
@@ -92,8 +115,6 @@ public class ManagementConsole implements Runnable {
             String nextInput = in.nextLine();
             try {
 
-
-
                 String[] nextInputTokens = nextInput.split(" ");
                 if (nextInputTokens[0].toLowerCase().equals("block")) {
                     printMgmtStyle("You wanna block " + nextInputTokens[1]);
@@ -131,6 +152,7 @@ public class ManagementConsole implements Runnable {
                 }
             } catch (Exception e) {
                 printMgmtStyle("Couldn't recognised command - please retry or enter HELP to see instructions ... ");
+                e.printStackTrace();
             }
         }
 
