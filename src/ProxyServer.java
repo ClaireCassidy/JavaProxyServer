@@ -1,31 +1,31 @@
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
 
 public class ProxyServer implements Runnable {
 
     private volatile boolean stopped = false;
-    private ArrayList<ConnectionHandlerThread2> activeConnectionHandlers;
     private int port;
     private ServerSocket serverSocket;
 
+    // creates a new ServerSocket given a port number that listens for connections
     public ProxyServer(int port) throws IOException {
 
-        activeConnectionHandlers = new ArrayList<>();
         this.port = port;
 
         serverSocket = new ServerSocket(port);
         System.out.println("Server established on port " + port);
     }
 
-    // may be called from Launcher to stop the server
+    // may be called from ManagementConsole to stop the server; prevents response to new connection requests
+    //      and thus the spawning of new ConnectionHandlerThreads
     public synchronized void stop() {
-        System.out.println("ProxyServer stopping ...");
+        ManagementConsole.printMgmtStyle("ProxyServer stopping ...");
         this.stopped = true;
     }
 
 
+    // checked after each connection to see if it should still be running
     private synchronized boolean isRunning() {
         return this.stopped == false;
     }
@@ -34,19 +34,17 @@ public class ProxyServer implements Runnable {
     public void run() {
         System.out.println("ProxyServer Running");
 
-        // set up socket on specified port
         try {
+            // while the server socket should still be accepting incoming connections
             while (this.isRunning() && serverSocket.isBound() && !serverSocket.isClosed()) {
 
                 // wait for connection and when received, assign to incoming
-                Socket incoming = serverSocket.accept();    // won't stop until it receives one more request which is annoying; write in docs that its safe to just terminate the program after quit regardless of if it exits itself.
-                System.out.println("Establishing ConnectionHandlerThread...");
+                Socket incoming = serverSocket.accept();
 
-                ConnectionHandlerThread2 newGuyOnTheBlock = new ConnectionHandlerThread2(incoming);
-                activeConnectionHandlers.add(newGuyOnTheBlock);
-                newGuyOnTheBlock.start();
-            }
-
+                // create a new thread and give it the socket to begin communications
+                ConnectionHandlerThread newThread = new ConnectionHandlerThread(incoming);
+                newThread.start();
+            } // loop and listen for new connections
         } catch (IOException e) {
             System.out.println("Error creating server socket @PORT:" + port);
             e.printStackTrace();

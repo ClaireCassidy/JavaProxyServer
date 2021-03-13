@@ -1,15 +1,12 @@
-import com.sun.xml.internal.ws.api.message.ExceptionHasMessage;
-
 import java.io.*;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Scanner;
 
 public class ManagementConsole implements Runnable {
 
     private volatile boolean stopped = false;
-    private static ArrayList<String> blockedSitesInstance = null;
-    private ProxyServer proxy;
+    private static ArrayList<String> blockedSitesInstance = null;   // dynamic copy of blocked.txt
+    private ProxyServer proxy;          // maintain reference so can stop proxy server from console
 
     // for easily distinguishing management console msgs
     public static final String ANSI_CYAN = "\u001B[36m";
@@ -22,9 +19,44 @@ public class ManagementConsole implements Runnable {
             "\tBLOCKLIST \t\t\t- print list of blocked sites";
 
 
-    public ManagementConsole() throws IOException {
-        // open blocked sites file
 
+    public ManagementConsole() throws IOException {
+
+        // 1. create necessary resources if they don't exist
+        // 2. load blocked sites so worker threads can intercept requests
+        // 3. create proxy server
+        // 4. repeatedly listen for user input at stdin
+
+        createAndLoadResources();
+
+        // create the proxy server
+        proxy = new ProxyServer(8080);
+
+        Thread proxyThread = new Thread(proxy);
+        proxyThread.start();
+    }
+
+    public static ArrayList<String> getBlockedSites() {
+        return blockedSitesInstance;
+    }
+
+    // may be called from Launcher to stop the mgmt console
+    public synchronized void stop() {
+
+        printMgmtStyle("Shutting down application ...");
+        this.stopped = true;
+    }
+
+    private synchronized boolean isRunning() {
+        return this.stopped == false;
+    }
+
+    // disambiguate between thread print statements and communication between console and end user
+    public static void printMgmtStyle(String toPrint) { // threads can also ask the console to print smth on their behalf
+        System.out.println(ANSI_CYAN + toPrint + ANSI_RESET);
+    }
+
+    private void createAndLoadResources() throws IOException {
 
         // create blocked.txt if doesn't exist
         File blockedSitesFile = new File("res\\blocked.txt");
@@ -36,7 +68,6 @@ public class ManagementConsole implements Runnable {
                 throw new IOException();
             }
         }
-
         // create res/cache if doesn't exist
         File cacheDir = new File("res\\cache");
         if (!cacheDir.exists()) {
@@ -74,32 +105,6 @@ public class ManagementConsole implements Runnable {
             e.printStackTrace();
         }
 
-        // can't load the cache dynamically.
-
-        // create the proxy server
-        proxy = new ProxyServer(8080);
-
-        Thread proxyThread = new Thread(proxy);
-        proxyThread.start();
-    }
-
-    public static ArrayList<String> getBlockedSites() {
-        return blockedSitesInstance;
-    }
-
-    // may be called from Launcher to stop the mgmt console
-    public synchronized void stop() {
-
-        printMgmtStyle("Shutting down application ...");
-        this.stopped = true;
-    }
-
-    private synchronized boolean isRunning() {
-        return this.stopped == false;
-    }
-
-    public static void printMgmtStyle(String toPrint) { // threads can also ask the console to print smth on their behalf
-        System.out.println(ANSI_CYAN + toPrint + ANSI_RESET);
     }
 
     @Override
@@ -107,58 +112,70 @@ public class ManagementConsole implements Runnable {
 
         Scanner in = new Scanner(System.in);
 
+        // instructions for user
         printMgmtStyle(INSTRUCTIONS);
 
         while (this.isRunning()) {
-            System.out.println(this.isRunning());
 
+            // parse next user command
             String nextInput = in.nextLine();
             try {
 
                 String[] nextInputTokens = nextInput.split(" ");
+
                 if (nextInputTokens[0].toLowerCase().equals("block")) {
-                    printMgmtStyle("You wanna block " + nextInputTokens[1]);
-                    printMgmtStyle("Blocking ...");
+
+                    printMgmtStyle("You want to block " + nextInputTokens[1]);
                     blockedSitesInstance.add(nextInputTokens[1]);
+                    printMgmtStyle(nextInputTokens[1] + " successfully blocked.");
+
                 } else if (nextInputTokens[0].toLowerCase().equals("help")) {
+
                     printMgmtStyle("\n" + INSTRUCTIONS + "\n");
+
                 } else if (nextInputTokens[0].toLowerCase().equals("unblock")) {
+
                     int index = blockedSitesInstance.indexOf(nextInputTokens[1]);
                     if (index >= 0) {
                         blockedSitesInstance.remove(index);
                         printMgmtStyle("Successfully removed "+nextInputTokens[1]+" from blocklist.");
-
-                        for (String site:blockedSitesInstance) {
-                            printMgmtStyle(site);
-                        }
-                    } else {    // not blocked
+                    } else {    // was not blocked
                         printMgmtStyle("\""+nextInputTokens[1] + "\" not found on blocklist.");
                     }
+
                 } else if (nextInputTokens[0].toLowerCase().equals("blocklist")) {
+
+                    printMgmtStyle("Contents of blocklist.txt: ");
                     for (String site:blockedSitesInstance) {
                         printMgmtStyle(site);
                     }
-                }
-                else if (nextInputTokens[0].toLowerCase().equals("quit")) {
+
+                } else if (nextInputTokens[0].toLowerCase().equals("quit")) {
                     printMgmtStyle("Quitting ... ");
+
                     printMgmtStyle("\t Writing blocked sites ...");
                     saveBlockedSitesConfig();
-                    printMgmtStyle("\tWriting cache ...");
-                    // TODO saveCacheConfig();
+
+                    // stop the proxy and the management console
                     proxy.stop();
                     this.stop();
+
                 } else {
-                    throw new IOException();
+                    printMgmtStyle("Couldn't recognised command - please retry or enter HELP to see instructions ... ");
+
                 }
             } catch (Exception e) {
                 printMgmtStyle("Couldn't recognised command - please retry or enter HELP to see instructions ... ");
-                e.printStackTrace();
+
+                //e.printStackTrace();
             }
         }
 
+        // reached after QUIT entered
         in.close();
     }
 
+    // On shutdown, called to write dynamic blocked files arraylist to blocked.txt for persistent blocking
     private void saveBlockedSitesConfig() {
         try {
             FileWriter fw = new FileWriter("res\\blocked.txt");
@@ -167,6 +184,7 @@ public class ManagementConsole implements Runnable {
             }
             fw.close();
         } catch (IOException e) {
+            printMgmtStyle("Error writing to blocked.txt");
             e.printStackTrace();
         }
     }
