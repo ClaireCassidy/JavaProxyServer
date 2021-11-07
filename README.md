@@ -1,5 +1,5 @@
 # JavaProxyServer
-*Proxy Server implemented in Java.*
+*Multithreaded Proxy Server implemented in Java, communicating with remote endpoints via HTTP/HTTPS via socket connections and implementing efficient persistent caching.*
 
 See documentation.pdf for detailed discussion
 
